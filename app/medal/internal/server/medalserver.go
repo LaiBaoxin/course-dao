@@ -23,7 +23,8 @@ func NewMedalServer(svcCtx *svc.ServiceContext) *MedalServer {
 	}
 }
 
-func (s *MedalServer) Ping(ctx context.Context, in *medal.Request) (*medal.Response, error) {
-	l := logic.NewPingLogic(ctx, s.svcCtx)
-	return l.Ping(in)
+// 根据地址获取勋章列表
+func (s *MedalServer) GetMedalsByAddress(ctx context.Context, in *medal.GetMedalsReq) (*medal.GetMedalsResp, error) {
+	l := logic.NewGetMedalsByAddressLogic(ctx, s.svcCtx)
+	return l.GetMedalsByAddress(in)
 }

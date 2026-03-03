@@ -3,14 +3,21 @@ syntax = "proto3";
 package medal;
 option go_package="./medal";
 
-message Request {
-  string ping = 1;
+message GetMedalsReq {
+  string address = 1; // 用户钱包地址
 }
 
-message Response {
-  string pong = 1;
+message MedalInfo {
+  uint64 token_id = 1;
+  string tx_hash = 2;
+  uint64 block_number = 3;
+}
+
+message GetMedalsResp {
+  repeated MedalInfo medals = 1;
 }
 
 service Medal {
-  rpc Ping(Request) returns(Response);
+  // 根据地址获取勋章列表
+  rpc GetMedalsByAddress(GetMedalsReq) returns (GetMedalsResp);
 }
