@@ -1,15 +1,17 @@
 import { useState, useEffect, useCallback } from 'react'
 import {
     Layout, Button, Card, Row, Col, Typography,
-    Badge, Spin, Empty, ConfigProvider, theme, message, Switch, Flex
+    Badge, Spin, Empty, ConfigProvider, theme, message, Switch, Flex, notification
 } from 'antd'
 import {
-    DisconnectOutlined, WalletOutlined, ReloadOutlined,
-    SafetyCertificateOutlined, ExportOutlined, SunOutlined, MoonOutlined
+    DisconnectOutlined, WalletOutlined,
+    SafetyCertificateOutlined, ExportOutlined, SunOutlined, MoonOutlined,
+    ThunderboltOutlined, LoadingOutlined
 } from '@ant-design/icons'
-import { useAccount, useConnect, useDisconnect } from 'wagmi'
+import { useAccount, useConnect, useDisconnect, useWriteContract, useWaitForTransactionReceipt } from 'wagmi'
 import { injected } from 'wagmi/connectors'
 import { getMedalsByAddress } from './api/medal'
+import { CONTRACT_ADDRESS, MEDAL_ABI } from './api/contract'
 import type { MedalInfo } from './api/types'
 
 const { Header, Content, Footer } = Layout
@@ -22,21 +24,19 @@ function App() {
     const [medals, setMedals] = useState<MedalInfo[]>([])
     const [loading, setLoading] = useState(false)
 
-    // 存储到本地进行持久化
-    const [isDarkMode, setIsDarkMode] = useState(() => {
-        return localStorage.getItem('theme') !== 'light'
-    })
+    // Mint 交互状态
+    const { data: hash, writeContract, isPending: isMinting } = useWriteContract()
+    const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({ hash })
 
-    // 主题界面样式
+    const [isDarkMode, setIsDarkMode] = useState(() => localStorage.getItem('theme') !== 'light')
+
+    // 💡 状态判定：是否处于“上链中”过程
+    const isProcessing = isMinting || isConfirming
+
     useEffect(() => {
         const root = window.document.documentElement
-        if (isDarkMode) {
-            root.classList.add('dark')
-            localStorage.setItem('theme', 'dark')
-        } else {
-            root.classList.remove('dark')
-            localStorage.setItem('theme', 'light')
-        }
+        isDarkMode ? root.classList.add('dark') : root.classList.remove('dark')
+        localStorage.setItem('theme', isDarkMode ? 'dark' : 'light')
     }, [isDarkMode])
 
     const fetchMedals = useCallback(async (addr: string) => {
@@ -44,22 +44,37 @@ function App() {
         try {
             const res = await getMedalsByAddress(addr)
             setMedals(res.medals || [])
-            if (res.medals?.length) {
-                message.success(`已成功同步 ${res.medals.length} 枚勋章`)
-            }
         } catch (err) {
-            message.error("数据同步失败，请检查 API 服务状态")
+            message.error("数据同步失败")
         } finally {
             setLoading(false)
         }
     }, [])
 
+    const handleMint = () => {
+        if (!address) return
+        writeContract({
+            address: CONTRACT_ADDRESS,
+            abi: MEDAL_ABI,
+            functionName: 'mint',
+            args: [address],
+        })
+    }
+
     useEffect(() => {
-        if (isConnected && address) {
-            fetchMedals(address)
-        } else {
-            setMedals([])
+        if (isConfirmed && address) {
+            notification.success({
+                message: '勋章领取成功',
+                description: '交易已确认，正在同步索引库...',
+                placement: 'bottomRight',
+            })
+            setTimeout(() => fetchMedals(address), 3000)
         }
+    }, [isConfirmed, address, fetchMedals])
+
+    useEffect(() => {
+        if (isConnected && address) fetchMedals(address)
+        else setMedals([])
     }, [isConnected, address, fetchMedals])
 
     return (
@@ -69,87 +84,58 @@ function App() {
                 token: {
                     colorPrimary: '#fadb14',
                     borderRadius: 16,
-                    colorBgLayout: isDarkMode ? '#0a0a0a' : '#f8f9fa'
                 },
             }}
         >
-            <Layout className={`min-h-screen transition-colors duration-500 ${isDarkMode ? 'bg-[#0a0a0a]' : 'bg-[#f8f9fa]'}`}>
+            {/* 💡 增加 min-h-screen 确保铺满全屏 */}
+            <Layout className={`min-h-screen flex flex-col transition-colors duration-500 ${isDarkMode ? 'bg-[#0a0a0a]' : 'bg-[#f8f9fa]'}`}>
                 <Header
                     style={{ background: 'transparent' }}
-                    className={`px-6 md:px-12 flex items-center justify-between sticky top-0 z-20 transition-all duration-300 border-b backdrop-blur-xl ${
+                    className={`px-6 md:px-12 flex items-center justify-between sticky top-0 z-20 transition-all border-b backdrop-blur-xl ${
                         isDarkMode ? 'bg-[#0a0a0a]/70 border-white/10' : 'bg-white/70 border-black/5'
                     }`}
                 >
                     <Flex align="center" gap="middle">
-                        <SafetyCertificateOutlined className="text-3xl text-yellow-500 drop-shadow-[0_0_8px_rgba(250,219,20,0.4)]" />
-                        <Title level={4} className="!m-0 !font-black italic tracking-tighter" style={{ color: isDarkMode ? '#fff' : '#000' }}>
-                            COURSE DAO
-                        </Title>
+                        <SafetyCertificateOutlined className="text-3xl text-yellow-500" />
+                        <Title level={4} className="!m-0 font-black italic tracking-tighter">COURSE DAO</Title>
                     </Flex>
 
                     <Flex align="center" gap="large">
-                        <Switch
-                            checkedChildren={<MoonOutlined />}
-                            unCheckedChildren={<SunOutlined />}
-                            checked={isDarkMode}
-                            onChange={setIsDarkMode}
-                        />
-
-                        {isConnected && (
-                            <Button
-                                type="text"
-                                shape="circle"
-                                icon={<ReloadOutlined spin={loading} />}
-                                onClick={() => address && fetchMedals(address)}
-                            />
-                        )}
+                        <Switch checkedChildren={<MoonOutlined />} unCheckedChildren={<SunOutlined />} checked={isDarkMode} onChange={setIsDarkMode} />
 
                         {isConnected ? (
-                            <Flex align="center" gap="middle" className="hidden sm:flex">
+                            <Flex align="center" gap="middle">
+                                {/* 💡 Header 上的申领按钮，处理中时变蓝色 */}
+                                <Button
+                                    type="primary"
+                                    icon={isProcessing ? <LoadingOutlined /> : <ThunderboltOutlined />}
+                                    loading={isProcessing}
+                                    onClick={handleMint}
+                                    className={`font-bold transition-all duration-500 border-none ${
+                                        isProcessing ? '!bg-[#0052ff] !text-white' : ''
+                                    }`}
+                                >
+                                    {isProcessing ? '上链中...' : '领取勋章'}
+                                </Button>
+
                                 <Badge status="processing" color="gold" text={
-                                    <Text code className={`font-mono px-2 py-1 rounded ${isDarkMode ? 'bg-white/10' : 'bg-black/5'}`}>
+                                    <Text code className={`font-mono px-2 py-1 rounded hidden sm:inline-block ${isDarkMode ? 'bg-white/10' : 'bg-black/5'}`}>
                                         {address?.slice(0, 6)}...{address?.slice(-4)}
                                     </Text>
                                 } />
-                                <Button
-                                    type="text"
-                                    danger
-                                    icon={<DisconnectOutlined />}
-                                    onClick={() => disconnect()}
-                                />
+                                <Button type="text" danger icon={<DisconnectOutlined />} onClick={() => disconnect()} />
                             </Flex>
                         ) : (
-                            <Button
-                                type="primary"
-                                size="large"
-                                shape="round"
-                                className="font-bold px-6"
-                                icon={<WalletOutlined />}
-                                onClick={() => connect({ connector: injected() })}
-                            >
-                                Connect Wallet
-                            </Button>
+                            <Button type="primary" size="large" shape="round" icon={<WalletOutlined />} onClick={() => connect({ connector: injected() })}>Connect Wallet</Button>
                         )}
                     </Flex>
                 </Header>
 
-                <Content className="p-6 md:p-12 max-w-7xl mx-auto w-full">
+                <Content className="p-6 md:p-12 max-w-7xl mx-auto w-full flex-grow">
                     {!isConnected ? (
                         <Flex vertical align="center" justify="center" className="py-40">
-                            <Empty
-                                image={<div className="text-8xl opacity-20 mb-4">🛡️</div>}
-                                description={
-                                    <Flex vertical gap="large">
-                                        <div>
-                                            <Title level={2}>验证您的成就</Title>
-                                            <Text type="secondary" className="text-lg">连接钱包以访问存储在 ClickHouse 中的链上结业证明</Text>
-                                        </div>
-                                        <Button type="primary" size="large" shape="round" block onClick={() => connect({ connector: injected() })}>
-                                            立即授权进入
-                                        </Button>
-                                    </Flex>
-                                }
-                            />
+                            <Empty image={<div className="text-8xl opacity-20 mb-4">🛡️</div>} description={<Title level={3}>连接钱包开启荣誉之旅</Title>} />
+                            <Button type="primary" size="large" shape="round" onClick={() => connect({ connector: injected() })}>立即授权进入</Button>
                         </Flex>
                     ) : (
                         <Spin spinning={loading} size="large">
@@ -169,47 +155,21 @@ function App() {
                                         <Col xs={24} sm={12} lg={8} key={item.tokenId}>
                                             <Card
                                                 hoverable
-                                                className={`border-none rounded-[2rem] transition-all hover:scale-[1.02] shadow-sm ${
-                                                    isDarkMode ? 'bg-zinc-900/50' : 'bg-white'
-                                                }`}
-                                                actions={[
-                                                    <Button
-                                                        type="link"
-                                                        icon={<ExportOutlined />}
-                                                        href={`https://etherscan.io/tx/${item.txHash}`}
-                                                        target="_blank"
-                                                        className="font-bold"
-                                                    >
-                                                        区块详情
-                                                    </Button>
-                                                ]}
+                                                className={`border-none rounded-[2rem] transition-all hover:scale-[1.02] shadow-sm ${isDarkMode ? 'bg-zinc-900/50' : 'bg-white'}`}
+                                                actions={[<Button type="link" icon={<ExportOutlined />} href={`https://etherscan.io/tx/${item.txHash}`} target="_blank">区块详情</Button>]}
                                             >
                                                 <Flex vertical gap="large">
                                                     <Flex justify="space-between">
-                                                        <div className="w-14 h-14 bg-gradient-to-br from-yellow-400 to-yellow-600 rounded-2xl flex items-center justify-center text-3xl shadow-lg shadow-yellow-500/20">
-                                                            🏆
-                                                        </div>
-                                                        <Text type="secondary" className="font-mono text-[10px] tracking-widest uppercase opacity-40">
-                                                            Verified ID: {item.tokenId}
-                                                        </Text>
+                                                        <div className="w-14 h-14 bg-gradient-to-br from-yellow-400 to-yellow-600 rounded-2xl flex items-center justify-center text-3xl shadow-lg shadow-yellow-500/20">🏆</div>
+                                                        <Text type="secondary" className="font-mono text-[10px] opacity-40">Verified ID: {item.tokenId}</Text>
                                                     </Flex>
-
                                                     <div>
                                                         <Title level={3} className="!mb-1 font-black">核心贡献勋章</Title>
                                                         <Text type="secondary">Course DAO 官方认证结业证明</Text>
                                                     </div>
-
                                                     <Flex vertical gap="small" className={`p-4 rounded-2xl ${isDarkMode ? 'bg-black/40' : 'bg-gray-50'}`}>
-                                                        <Flex justify="space-between">
-                                                            <Text className="text-[10px] uppercase font-bold text-gray-400">Transaction</Text>
-                                                            <Text copyable={{ text: item.txHash }} className="font-mono text-xs opacity-80">
-                                                                {item.txHash.slice(0, 8)}...
-                                                            </Text>
-                                                        </Flex>
-                                                        <Flex justify="space-between">
-                                                            <Text className="text-[10px] uppercase font-bold text-gray-400">Block Height</Text>
-                                                            <Text className="font-mono text-xs font-bold">{item.blockNumber}</Text>
-                                                        </Flex>
+                                                        <Flex justify="space-between"><Text className="text-[10px] uppercase font-bold text-gray-400">Transaction</Text><Text copyable={{ text: item.txHash }} className="font-mono text-xs">{item.txHash.slice(0, 8)}...</Text></Flex>
+                                                        <Flex justify="space-between"><Text className="text-[10px] uppercase font-bold text-gray-400">Block Height</Text><Text className="font-mono text-xs font-bold">{item.blockNumber}</Text></Flex>
                                                     </Flex>
                                                 </Flex>
                                             </Card>
@@ -217,16 +177,35 @@ function App() {
                                     ))}
                                 </Row>
                             ) : (
-                                <Empty description="您的仓库空空如也" className="py-40" />
+                                <Empty
+                                    description={
+                                        <Flex vertical align="center" gap="middle">
+                                            <Text type="secondary">您的仓库空空如也</Text>
+                                            {/* 💡 页面中间的申领按钮，处理中时变蓝色 */}
+                                            <Button
+                                                type="primary"
+                                                size="large"
+                                                shape="round"
+                                                icon={isProcessing ? <LoadingOutlined /> : <ThunderboltOutlined />}
+                                                onClick={handleMint}
+                                                loading={isProcessing}
+                                                className={`transition-all duration-500 border-none ${
+                                                    isProcessing ? '!bg-[#0052ff] !text-white' : ''
+                                                }`}
+                                            >
+                                                {isProcessing ? '正在请求上链...' : '立即申领我的勋章'}
+                                            </Button>
+                                        </Flex>
+                                    }
+                                    className="py-40"
+                                />
                             )}
                         </Spin>
                     )}
                 </Content>
 
-                <Footer className="text-center py-12 bg-transparent opacity-30">
-                    <Text className="font-mono text-[10px] tracking-[0.3em] uppercase">
-                        Built with Go-Zero · ClickHouse · React · AntD 5
-                    </Text>
+                <Footer className="text-center py-12 bg-transparent opacity-30 mt-auto">
+                    <Text className="font-mono text-[10px] tracking-[0.3em] uppercase">Built with Go-Zero · ClickHouse · React · AntD 5</Text>
                 </Footer>
             </Layout>
         </ConfigProvider>
