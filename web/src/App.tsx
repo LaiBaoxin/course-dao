@@ -30,7 +30,7 @@ function App() {
 
     const [isDarkMode, setIsDarkMode] = useState(() => localStorage.getItem('theme') !== 'light')
 
-    // 💡 状态判定：是否处于“上链中”过程
+    // 是否处于“上链中”过程
     const isProcessing = isMinting || isConfirming
 
     useEffect(() => {
@@ -56,7 +56,7 @@ function App() {
         writeContract({
             address: CONTRACT_ADDRESS,
             abi: MEDAL_ABI,
-            functionName: 'mint',
+            functionName: 'safeMint',
             args: [address],
         })
     }
@@ -68,6 +68,7 @@ function App() {
                 description: '交易已确认，正在同步索引库...',
                 placement: 'bottomRight',
             })
+            // 交易成功后延迟刷新数据
             setTimeout(() => fetchMedals(address), 3000)
         }
     }, [isConfirmed, address, fetchMedals])
@@ -87,7 +88,6 @@ function App() {
                 },
             }}
         >
-            {/* 💡 增加 min-h-screen 确保铺满全屏 */}
             <Layout className={`min-h-screen flex flex-col transition-colors duration-500 ${isDarkMode ? 'bg-[#0a0a0a]' : 'bg-[#f8f9fa]'}`}>
                 <Header
                     style={{ background: 'transparent' }}
@@ -105,7 +105,6 @@ function App() {
 
                         {isConnected ? (
                             <Flex align="center" gap="middle">
-                                {/* 💡 Header 上的申领按钮，处理中时变蓝色 */}
                                 <Button
                                     type="primary"
                                     icon={isProcessing ? <LoadingOutlined /> : <ThunderboltOutlined />}
@@ -181,7 +180,6 @@ function App() {
                                     description={
                                         <Flex vertical align="center" gap="middle">
                                             <Text type="secondary">您的仓库空空如也</Text>
-                                            {/* 💡 页面中间的申领按钮，处理中时变蓝色 */}
                                             <Button
                                                 type="primary"
                                                 size="large"
