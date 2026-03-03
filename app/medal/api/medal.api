@@ -1,0 +1,21 @@
+syntax = "v1"
+
+type GetMedalsReq {
+	Address string `path:"address"`
+}
+
+type MedalInfo {
+	TokenId     uint64 `json:"tokenId"`
+	TxHash      string `json:"txHash"`
+	BlockNumber uint64 `json:"blockNumber"`
+}
+
+type GetMedalsResp {
+	Medals []MedalInfo `json:"medals"`
+}
+
+service medal-api {
+	@handler GetMedals
+	get /v1/medals/:address (GetMedalsReq) returns (GetMedalsResp)
+}
+
