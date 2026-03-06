@@ -14,13 +14,17 @@ import (
 )
 
 type (
-	GetMedalsReq  = medal.GetMedalsReq
-	GetMedalsResp = medal.GetMedalsResp
-	MedalInfo     = medal.MedalInfo
+	GetMedalProofReq  = medal.GetMedalProofReq
+	GetMedalProofResp = medal.GetMedalProofResp
+	GetMedalsReq      = medal.GetMedalsReq
+	GetMedalsResp     = medal.GetMedalsResp
+	MedalInfo         = medal.MedalInfo
 
 	Medal interface {
 		// 根据地址获取勋章列表
 		GetMedalsByAddress(ctx context.Context, in *GetMedalsReq, opts ...grpc.CallOption) (*GetMedalsResp, error)
+		// 根据地址获取勋章证明
+		GetMedalProof(ctx context.Context, in *GetMedalProofReq, opts ...grpc.CallOption) (*GetMedalProofResp, error)
 	}
 
 	defaultMedal struct {
@@ -38,4 +42,10 @@ func NewMedal(cli zrpc.Client) Medal {
 func (m *defaultMedal) GetMedalsByAddress(ctx context.Context, in *GetMedalsReq, opts ...grpc.CallOption) (*GetMedalsResp, error) {
 	client := medal.NewMedalClient(m.cli.Conn())
 	return client.GetMedalsByAddress(ctx, in, opts...)
+}
+
+// 根据地址获取勋章证明
+func (m *defaultMedal) GetMedalProof(ctx context.Context, in *GetMedalProofReq, opts ...grpc.CallOption) (*GetMedalProofResp, error) {
+	client := medal.NewMedalClient(m.cli.Conn())
+	return client.GetMedalProof(ctx, in, opts...)
 }

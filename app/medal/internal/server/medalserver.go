@@ -28,3 +28,9 @@ func (s *MedalServer) GetMedalsByAddress(ctx context.Context, in *medal.GetMedal
 	l := logic.NewGetMedalsByAddressLogic(ctx, s.svcCtx)
 	return l.GetMedalsByAddress(in)
 }
+
+// 根据地址获取勋章证明
+func (s *MedalServer) GetMedalProof(ctx context.Context, in *medal.GetMedalProofReq) (*medal.GetMedalProofResp, error) {
+	l := logic.NewGetMedalProofLogic(ctx, s.svcCtx)
+	return l.GetMedalProof(in)
+}

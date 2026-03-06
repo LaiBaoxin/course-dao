@@ -17,7 +17,18 @@ message GetMedalsResp {
   repeated MedalInfo medals = 1;
 }
 
+message GetMedalProofReq {
+  string address = 1;
+}
+
+message GetMedalProofResp {
+  repeated string proof = 1;
+  uint64 tokenId = 2;
+}
+
 service Medal {
   // 根据地址获取勋章列表
   rpc GetMedalsByAddress(GetMedalsReq) returns (GetMedalsResp);
+  // 根据地址获取勋章证明
+  rpc GetMedalProof(GetMedalProofReq) returns (GetMedalProofResp);
 }

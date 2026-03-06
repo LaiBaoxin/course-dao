@@ -37,15 +37,36 @@ func (l *GetMedalsLogic) GetMedals(req *types.GetMedalsReq) (resp *types.GetMeda
 		return nil, err
 	}
 
-	// 类型转换
-	var list []types.MedalInfo
-	for _, m := range rpcResp.Medals {
-		list = append(list, types.MedalInfo{
-			TokenId:     m.TokenId,
-			TxHash:      m.TxHash,
-			BlockNumber: m.BlockNumber,
-		})
+	// 查询该用户是否有资格领取新勋章
+	proofResp, err := l.svcCtx.MedalRpc.GetMedalProof(l.ctx, &medal.GetMedalProofReq{
+		Address: req.Address,
+	})
+
+	var proof []string
+	var claimId uint64
+	if err == nil {
+		// 说明在白名单里，拿到了证明
+		proof = proofResp.Proof
+		claimId = proofResp.TokenId
+	} else {
+		l.Infof("地址 %s 无可领取勋章或不在白名单", req.Address)
 	}
 
-	return &types.GetMedalsResp{Medals: list}, nil
+	// 组装已拥有勋章列表
+	var list []types.MedalInfo
+	if rpcResp != nil {
+		for _, m := range rpcResp.Medals {
+			list = append(list, types.MedalInfo{
+				TokenId:     m.TokenId,
+				TxHash:      m.TxHash,
+				BlockNumber: m.BlockNumber,
+			})
+		}
+	}
+
+	return &types.GetMedalsResp{
+		Medals:           list,
+		Proof:            proof,   // 如果没有资格，这里是空数组
+		ClaimableTokenId: claimId, // 如果没有资格，这里是 0
+	}, nil
 }
