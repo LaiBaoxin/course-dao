@@ -23,6 +23,12 @@ contract CourseVaultTest is Test {
     function testGovernanceFlow() public {
         // 1. 发放勋章
         medal.safeMint(student);
+
+        // 学生必须委托给自己才能激活投票权快照
+        vm.prank(student);
+        medal.delegate(student);
+
+        // 推进区块以确保委托生效并产生 Checkpoint
         vm.roll(block.number + 1); 
 
         // 2. 发起提案
