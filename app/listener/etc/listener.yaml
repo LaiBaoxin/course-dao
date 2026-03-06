@@ -1,7 +1,10 @@
-EthEndpoint: "http://127.0.0.1:8545"
-MedalAddress: "0x5FbDB2315678afecb367f032d93F642f64180aa3" # 替换为你部署后的地址
+Eth:
+  WSRpc: "ws://127.0.0.1:8545"
+  ContractAddress: "0x5FbDB2315678afecb367f032d93F642f64180aa3"
+  StartBlock: 7
 ClickHouse:
-  DataSource: "clickhouse://admin:123456@127.0.0.1:9000/course_dao"
-Log:
-  ServiceName: medal-listener
-  Level: info
+  Addr:
+    - "127.0.0.1:9000"
+  Database: "course_dao"
+  Username: "admin"
+  Password: "123456"
