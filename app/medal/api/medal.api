@@ -11,7 +11,9 @@ type MedalInfo {
 }
 
 type GetMedalsResp {
-	Medals []MedalInfo `json:"medals"`
+	Medals           []MedalInfo `json:"medals"`
+	Proof            []string    `json:"proof"`
+	ClaimableTokenId uint64      `json:"claimableTokenId"`
 }
 
 service medal-api {

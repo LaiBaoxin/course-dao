@@ -8,7 +8,9 @@ type GetMedalsReq struct {
 }
 
 type GetMedalsResp struct {
-	Medals []MedalInfo `json:"medals"`
+	Medals           []MedalInfo `json:"medals"`
+	Proof            []string    `json:"proof"`
+	ClaimableTokenId uint64      `json:"claimableTokenId"`
 }
 
 type MedalInfo struct {

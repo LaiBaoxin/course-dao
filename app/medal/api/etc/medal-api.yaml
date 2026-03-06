@@ -4,4 +4,5 @@ Port: 8888
 MedalRpc:
   Endpoints:
     - 127.0.0.1:8080 # RPC 服务的地址
+  Key: medal.rpc
   NonBlock: true
