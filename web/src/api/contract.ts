@@ -4,6 +4,16 @@ export const CONTRACT_ADDRESS = '0x5FbDB2315678afecb367f032d93F642f64180aa3';
 export const MEDAL_ABI = [
     {
         "type": "function",
+        "name": "claim",
+        "inputs": [
+            { "name": "proof", "type": "bytes32[]", "internalType": "bytes32[]" },
+            { "name": "tokenId", "type": "uint256", "internalType": "uint256" }
+        ],
+        "outputs": [],
+        "stateMutability": "nonpayable"
+    },
+    {
+        "type": "function",
         "name": "safeMint",
         "inputs": [{ "name": "to", "type": "address", "internalType": "address" }],
         "outputs": [],
