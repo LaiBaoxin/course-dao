@@ -1,7 +1,7 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 import { WagmiProvider, createConfig, http } from 'wagmi'
-import { mainnet, foundry } from 'wagmi/chains'
+import { foundry } from 'wagmi/chains'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import App from './App'
 import './index.css'
@@ -9,10 +9,10 @@ import './index.css'
 const queryClient = new QueryClient()
 
 const config = createConfig({
-    chains: [mainnet, foundry],
+    // 确保所有请求都打向本地
+    chains: [foundry],
     transports: {
-        [mainnet.id]: http(),
-        [foundry.id]: http('http://127.0.0.1:8545'), // 本地 Anvil 节点
+        [foundry.id]: http('http://127.0.0.1:8545', { batch: false }),
     },
 })
 
