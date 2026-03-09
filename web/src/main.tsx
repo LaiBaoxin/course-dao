@@ -12,7 +12,7 @@ const config = createConfig({
     // 确保所有请求都打向本地
     chains: [foundry],
     transports: {
-        [foundry.id]: http('http://127.0.0.1:8545', { batch: false }),
+        [foundry.id]: http('http://127.0.0.1:9545', { batch: false }),
     },
 })
 

@@ -1,5 +1,5 @@
 // src/hooks/useMedal.ts
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { ethers } from 'ethers';
 import request from '../utils/request';
 import { CONTRACT_ADDRESS, MEDAL_ABI } from '../api/contract';
@@ -13,13 +13,22 @@ export const useMedal = () => {
     const [claimId, setClaimId] = useState<number | null>(null);
     const [loading, setLoading] = useState(false);
 
+    const clearState = useCallback(() => {
+        setAccount('');
+        setOwnedMedals([]);
+        setProof([]);
+        setClaimId(null);
+    }, []);
+
     const fetchData = useCallback(async (address: string) => {
+        if (!address) return;
         try {
             const res: any = await request.get(`/v1/medals/${address}`);
+            // 初始化为空
             const medals = res.medals || [];
             setOwnedMedals(medals);
 
-            // 逻辑：如果该 TokenID 已在拥有的列表中，则清空证明以隐藏 UI
+            // 如果领过了就不显示证明
             const isClaimed = medals.some((m: any) => Number(m.tokenId) === Number(res.claimableTokenId));
 
             if (!isClaimed && res.proof?.length > 0) {
@@ -33,6 +42,27 @@ export const useMedal = () => {
             console.error("Fetch data failed", err);
         }
     }, []);
+
+    useEffect(() => {
+        const eth = window.ethereum as any;
+        if (eth && eth.on) {
+            const handleAccountsChanged = (accounts: string[]) => {
+                if (accounts.length > 0) {
+                    setAccount(accounts[0]);
+                    fetchData(accounts[0]);
+                } else {
+                    clearState();
+                }
+            };
+            const handleChainChanged = () => window.location.reload();
+            eth.on('accountsChanged', handleAccountsChanged);
+            eth.on('chainChanged', handleChainChanged);
+            return () => {
+                eth.removeListener('accountsChanged', handleAccountsChanged);
+                eth.removeListener('chainChanged', handleChainChanged);
+            };
+        }
+    }, [fetchData, clearState]);
 
     const connectWallet = async () => {
         if (!window.ethereum) {
@@ -49,11 +79,25 @@ export const useMedal = () => {
         }
     };
 
+    const disconnectWallet = () => {
+        clearState();
+        msgApi.info({ content: '已断开钱包连接' });
+    };
+
     const handleClaim = async () => {
-        if (!proof.length || !claimId || !window.ethereum) return;
+        // claimId 的合法性深度校验
+        if (proof.length === 0 || claimId === null || claimId === 0) {
+            msgApi.warning({ content: '申领凭证无效，请确保您在白名单中' });
+            return;
+        }
+
+        if (!window.ethereum) {
+            msgApi.error({ content: '未检测到环境' });
+            return;
+        }
 
         modal.confirm({
-            title: '确认领取',
+            title: '确认领取荣誉',
             content: `即将领取 Course DAO #${claimId} 号勋章，是否继续？`,
             onOk: async () => {
                 try {
@@ -62,21 +106,29 @@ export const useMedal = () => {
                     const signer = await provider.getSigner();
                     const contract = new ethers.Contract(CONTRACT_ADDRESS, MEDAL_ABI, signer);
 
+                    // 在发送交易前再次确认 root 状态（防御 revert）
+                    const rootOnChain = await contract.merkleRoot();
+                    if (rootOnChain === ethers.ZeroHash) {
+                        throw new Error("合约 Merkle Root 未初始化，请联系管理员运行 set_root.go");
+                    }
+
                     const tx = await contract.claim(proof, claimId);
                     msgApi.info({ content: '交易已发出，等待链上确认...', duration: 4 });
 
                     await tx.wait();
+                    msgApi.success({ content: `🎉 领取成功！ID: #${claimId}` });
 
-                    msgApi.success({ content: `领取成功！ID: #${claimId}`, duration: 5 });
-
-                    // 领取成功后立即清理 proof 状态
                     setProof([]);
                     setClaimId(null);
-
-                    // 延迟同步 ClickHouse 索引
                     setTimeout(() => fetchData(account), 3000);
                 } catch (err: any) {
-                    msgApi.error({ content: err.reason || '交易失败' });
+                    console.error("Claim Error Details:", err);
+                    const reason = err.reason || err.message || "";
+                    if (reason.includes("0x7e273289")) {
+                        msgApi.error({ content: "操作失败：该勋章目前无法在链上定位，请检查合约部署状态" });
+                    } else {
+                        msgApi.error({ content: `失败: ${reason.slice(0, 50)}` });
+                    }
                 } finally {
                     setLoading(false);
                 }
@@ -84,5 +136,5 @@ export const useMedal = () => {
         });
     };
 
-    return { account, ownedMedals, proof, claimId, loading, connectWallet, handleClaim };
+    return { account, ownedMedals, proof, claimId, loading, connectWallet, disconnectWallet, handleClaim };
 };

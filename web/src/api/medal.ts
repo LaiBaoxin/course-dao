@@ -1,5 +1,5 @@
 import request from '../utils/request';
-import type {GetMedalsResp} from './types';
+import type { GetMedalsResp, MedalDetailRes } from './types';
 
 /**
  * 获取指定地址的勋章列表
@@ -7,4 +7,12 @@ import type {GetMedalsResp} from './types';
  */
 export const getMedalsByAddress = (address: string): Promise<GetMedalsResp> => {
     return request.get(`/v1/medals/${address}`);
+};
+
+/**
+ * 获取特定勋章的链上存证详情
+ * @param tokenId 勋章编号
+ */
+export const getMedalDetailByTokenId = (tokenId: number): Promise<MedalDetailRes> => {
+    return request.get(`/v1/medals/detail/${tokenId}`);
 };
