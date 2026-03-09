@@ -13,6 +13,16 @@ type GetMedalsResp struct {
 	ClaimableTokenId uint64      `json:"claimableTokenId"`
 }
 
+type LoginReq struct {
+	Address   string `json:"address"`
+	Message   string `json:"message"`
+	Signature string `json:"signature"`
+}
+
+type LoginResp struct {
+	Token string `json:"token"`
+}
+
 type MedalDetailReq struct {
 	TokenId uint64 `path:"tokenId"`
 }
@@ -30,4 +40,12 @@ type MedalInfo struct {
 	TokenId     uint64 `json:"tokenId"`
 	TxHash      string `json:"txHash"`
 	BlockNumber uint64 `json:"blockNumber"`
+}
+
+type NonceReq struct {
+	Address string `json:"address"`
+}
+
+type NonceResp struct {
+	Nonce string `json:"nonce"`
 }

@@ -6,6 +6,7 @@ package handler
 import (
 	"net/http"
 
+	auth "github.com/wwater/course-dao/app/medal/api/internal/handler/auth"
 	"github.com/wwater/course-dao/app/medal/api/internal/svc"
 
 	"github.com/zeromicro/go-zero/rest"
@@ -25,5 +26,23 @@ func RegisterHandlers(server *rest.Server, serverCtx *svc.ServiceContext) {
 				Handler: GetMedalDetailHandler(serverCtx),
 			},
 		},
+	)
+
+	server.AddRoutes(
+		[]rest.Route{
+			{
+				// 钱包签名登录
+				Method:  http.MethodPost,
+				Path:    "/login",
+				Handler: auth.LoginHandler(serverCtx),
+			},
+			{
+				// 获取登录随机数
+				Method:  http.MethodPost,
+				Path:    "/nonce",
+				Handler: auth.GetNonceHandler(serverCtx),
+			},
+		},
+		rest.WithPrefix("/v1/auth"),
 	)
 }

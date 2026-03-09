@@ -38,3 +38,35 @@ service medal-api {
 	get /v1/medals/detail/:tokenId (MedalDetailReq) returns (MedalDetailRes)
 }
 
+// 登录服务相关的内容
+type (
+	NonceReq {
+		Address string `json:"address"`
+	}
+	NonceResp {
+		Nonce string `json:"nonce"`
+	}
+	LoginReq {
+		Address   string `json:"address"`
+		Message   string `json:"message"`
+		Signature string `json:"signature"`
+	}
+	LoginResp {
+		Token string `json:"token"`
+	}
+)
+
+@server (
+	prefix: /v1/auth
+	group:  auth
+)
+service medal-api {
+	@doc "获取登录随机数"
+	@handler getNonce
+	post /nonce (NonceReq) returns (NonceResp)
+
+	@doc "钱包签名登录"
+	@handler login
+	post /login (LoginReq) returns (LoginResp)
+}
+

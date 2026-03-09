@@ -15,4 +15,8 @@ type Config struct {
 		Rpc             string
 		ContractAddress string
 	}
+	Auth struct {
+		AccessSecret string
+		AccessExpire int64
+	}
 }
