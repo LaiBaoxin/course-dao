@@ -70,3 +70,24 @@ service medal-api {
 	post /login (LoginReq) returns (LoginResp)
 }
 
+type (
+	CourseReq  {}
+	CourseResp {
+		VideoUrl string `json:"video_url"`
+		Title    string `json:"title"`
+	}
+)
+
+// --- 加锁的路由区 ---
+@server (
+	prefix:     /v1/course
+	group:      course
+	jwt:        Auth // 开启 Go-Zero 内置的 JWT 解析
+	middleware: CheckMedalMiddleware // 挂载自定义的勋章查验锁
+)
+service medal-api {
+	@doc "获取高级课程视频 (仅限 Course DAO 勋章持有者)"
+	@handler getPremiumCourse
+	get /premium (CourseReq) returns (CourseResp)
+}
+

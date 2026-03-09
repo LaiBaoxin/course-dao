@@ -8,14 +8,17 @@ import (
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/wwater/course-dao/app/common/contract/medal"
 	"github.com/wwater/course-dao/app/medal/api/internal/config"
+	"github.com/wwater/course-dao/app/medal/api/internal/middleware"
 	"github.com/wwater/course-dao/app/medal/medalclient"
+	"github.com/zeromicro/go-zero/rest"
 	"github.com/zeromicro/go-zero/zrpc"
 )
 
 type ServiceContext struct {
-	Config        config.Config
-	MedalRpc      medalclient.Medal
-	MedalContract *medal.CourseMedal
+	Config               config.Config
+	MedalRpc             medalclient.Medal
+	MedalContract        *medal.CourseMedal
+	CheckMedalMiddleware rest.Middleware // 注册自定义中间件
 }
 
 func NewServiceContext(c config.Config) *ServiceContext {
@@ -32,9 +35,12 @@ func NewServiceContext(c config.Config) *ServiceContext {
 		panic("合约绑定失败: " + err.Error())
 	}
 
+	medalRpc := medalclient.NewMedal(zrpc.MustNewClient(c.MedalRpc))
+
 	return &ServiceContext{
-		Config:        c,
-		MedalRpc:      medalclient.NewMedal(zrpc.MustNewClient(c.MedalRpc)),
-		MedalContract: medalContract,
+		Config:               c,
+		MedalRpc:             medalRpc,
+		MedalContract:        medalContract,
+		CheckMedalMiddleware: middleware.NewCheckMedalMiddleware(medalRpc).Handle,
 	}
 }
