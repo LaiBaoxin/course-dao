@@ -14,17 +14,21 @@ import (
 )
 
 type (
-	GetMedalProofReq  = medal.GetMedalProofReq
-	GetMedalProofResp = medal.GetMedalProofResp
-	GetMedalsReq      = medal.GetMedalsReq
-	GetMedalsResp     = medal.GetMedalsResp
-	MedalInfo         = medal.MedalInfo
+	GetMedalByTokenIdReq = medal.GetMedalByTokenIdReq
+	GetMedalProofReq     = medal.GetMedalProofReq
+	GetMedalProofResp    = medal.GetMedalProofResp
+	GetMedalsReq         = medal.GetMedalsReq
+	GetMedalsResp        = medal.GetMedalsResp
+	MedalDetail          = medal.MedalDetail
+	MedalInfo            = medal.MedalInfo
 
 	Medal interface {
 		// 根据地址获取勋章列表
 		GetMedalsByAddress(ctx context.Context, in *GetMedalsReq, opts ...grpc.CallOption) (*GetMedalsResp, error)
 		// 根据地址获取勋章证明
 		GetMedalProof(ctx context.Context, in *GetMedalProofReq, opts ...grpc.CallOption) (*GetMedalProofResp, error)
+		// 根据tokenId获取勋章详情
+		GetMedalByTokenId(ctx context.Context, in *GetMedalByTokenIdReq, opts ...grpc.CallOption) (*MedalDetail, error)
 	}
 
 	defaultMedal struct {
@@ -48,4 +52,10 @@ func (m *defaultMedal) GetMedalsByAddress(ctx context.Context, in *GetMedalsReq,
 func (m *defaultMedal) GetMedalProof(ctx context.Context, in *GetMedalProofReq, opts ...grpc.CallOption) (*GetMedalProofResp, error) {
 	client := medal.NewMedalClient(m.cli.Conn())
 	return client.GetMedalProof(ctx, in, opts...)
+}
+
+// 根据tokenId获取勋章详情
+func (m *defaultMedal) GetMedalByTokenId(ctx context.Context, in *GetMedalByTokenIdReq, opts ...grpc.CallOption) (*MedalDetail, error) {
+	client := medal.NewMedalClient(m.cli.Conn())
+	return client.GetMedalByTokenId(ctx, in, opts...)
 }

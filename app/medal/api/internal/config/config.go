@@ -11,4 +11,8 @@ import (
 type Config struct {
 	rest.RestConf
 	MedalRpc zrpc.RpcClientConf
+	Eth      struct {
+		Rpc             string
+		ContractAddress string
+	}
 }

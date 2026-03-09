@@ -36,46 +36,43 @@ func NewGetMedalProofLogic(ctx context.Context, svcCtx *svc.ServiceContext) *Get
 // GetMedalProof 根据地址获取勋章证明
 func (l *GetMedalProofLogic) GetMedalProof(in *medal.GetMedalProofReq) (*medal.GetMedalProofResp, error) {
 	// 将输入的字符串地址转换为以太坊地址类型
-	userAddr := common.HexToAddress(in.Address)
-	l.Infof("开始为地址生成 Merkle Proof: %s", userAddr.Hex())
+	targetAddr := common.HexToAddress(in.Address)
+	l.Infof("开始为地址生成 Merkle Proof: %s", targetAddr.Hex())
 
 	var leaves [][]byte
 	var userTokenId uint64
 	var found bool
 
-	// 遍历白名单：构建所有叶子节点，并匹配当前用户
+	// 构建白名单所有叶子节点，并匹配当前用户
 	for _, d := range whiteList {
-		// 使用我们工具类中的 HashLeaf (52字节对齐逻辑)
-		leaf := utils.HashLeaf(d.Account, d.TokenId)
-		leaves = append(leaves, leaf)
-
-		if d.Account == userAddr {
+		// 直接比对 Address 类型
+		if d.Account == targetAddr {
 			userTokenId = d.TokenId
 			found = true
 		}
+		// 构建 Tree 时使用的哈希必须一致
+		leaf := utils.HashLeaf(d.Account.Hex(), d.TokenId)
+		leaves = append(leaves, leaf)
 	}
 
-	// 如果地址不在白名单中，拒绝请求
 	if !found {
-		l.Errorf("查询失败：地址 %s 不在白名单内", userAddr.Hex())
 		return nil, errors.New("address not in whitelist")
 	}
 
-	// 构建 Merkle Tree
 	tree := utils.NewMerkleTree(leaves)
+	userLeaf := utils.HashLeaf(targetAddr.Hex(), userTokenId)
 
-	// 生成当前用户的 Proof 路径
-	userLeaf := utils.HashLeaf(userAddr, userTokenId)
 	proofBytes := tree.GetProof(userLeaf)
+	if proofBytes == nil {
+		return nil, errors.New("failed to generate proof")
+	}
 
-	// 将 [][]byte 格式的证明转换为前端易读的 Hex 字符串数组
 	var proofStrings []string
 	for _, p := range proofBytes {
 		proofStrings = append(proofStrings, common.BytesToHash(p).Hex())
 	}
 
-	l.Infof("证明生成成功！TokenID: %d, Proof 深度: %d", userTokenId, len(proofStrings))
-
+	l.Infof("Proof 生成成功: ID=%d, Root=0x%x", userTokenId, tree.Root)
 	return &medal.GetMedalProofResp{
 		Proof:   proofStrings,
 		TokenId: userTokenId,

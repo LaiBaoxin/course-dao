@@ -6,3 +6,6 @@ MedalRpc:
     - 127.0.0.1:8080 # RPC 服务的地址
   Key: medal.rpc
   NonBlock: true
+Eth:
+  Rpc: http://127.0.0.1:8545
+  ContractAddress: 0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512

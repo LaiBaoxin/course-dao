@@ -20,7 +20,7 @@ func main() {
 	// Anvil 默认第一个私钥 (持有者/老师)
 	privateKeyHex := "ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
 	//  CourseMedal 合约地址
-	contractAddr := common.HexToAddress("0x5FbDB2315678afecb367f032d93F642f64180aa3")
+	contractAddr := common.HexToAddress("0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512")
 
 	// 准备白名单
 	whiteList := []utils.LeafData{
@@ -31,7 +31,7 @@ func main() {
 	// 计算 Merkle Root
 	var leaves [][]byte
 	for _, d := range whiteList {
-		leaves = append(leaves, utils.HashLeaf(d.Account, d.TokenId))
+		leaves = append(leaves, utils.HashLeaf(d.Account.Hex(), d.TokenId))
 	}
 	tree := utils.NewMerkleTree(leaves)
 	var root32 [32]byte

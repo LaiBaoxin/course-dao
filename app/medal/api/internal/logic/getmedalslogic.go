@@ -5,10 +5,9 @@ package logic
 
 import (
 	"context"
-	"github.com/wwater/course-dao/app/medal/medal"
-
 	"github.com/wwater/course-dao/app/medal/api/internal/svc"
 	"github.com/wwater/course-dao/app/medal/api/internal/types"
+	"github.com/wwater/course-dao/app/medal/medal"
 
 	"github.com/zeromicro/go-zero/core/logx"
 )
@@ -29,30 +28,25 @@ func NewGetMedalsLogic(ctx context.Context, svcCtx *svc.ServiceContext) *GetMeda
 
 // GetMedals 获取用户所有勋章
 func (l *GetMedalsLogic) GetMedals(req *types.GetMedalsReq) (resp *types.GetMedalsResp, err error) {
-	// 调用 rpc 处理方法
-	rpcResp, err := l.svcCtx.MedalRpc.GetMedalsByAddress(l.ctx, &medal.GetMedalsReq{
+	// 1. 获取已拥有列表
+	rpcResp, _ := l.svcCtx.MedalRpc.GetMedalsByAddress(l.ctx, &medal.GetMedalsReq{
 		Address: req.Address,
 	})
-	if err != nil {
-		return nil, err
-	}
 
-	// 查询该用户是否有资格领取新勋章
+	// 2. 获取 Proof（始终尝试获取，不因为本地数据库状态拦截）
 	proofResp, err := l.svcCtx.MedalRpc.GetMedalProof(l.ctx, &medal.GetMedalProofReq{
 		Address: req.Address,
 	})
 
 	var proof []string
 	var claimId uint64
-	if err == nil {
-		// 说明在白名单里，拿到了证明
+	if err == nil && proofResp != nil {
+		// 即使 BalanceOf > 0 也建议下发 Proof，由前端决定是否显示“已领取”按钮
+		// 这样可以避免 Anvil 重启后 API 拦截导致的无法测试
 		proof = proofResp.Proof
 		claimId = proofResp.TokenId
-	} else {
-		l.Infof("地址 %s 无可领取勋章或不在白名单", req.Address)
 	}
 
-	// 组装已拥有勋章列表
 	var list []types.MedalInfo
 	if rpcResp != nil {
 		for _, m := range rpcResp.Medals {
@@ -66,7 +60,7 @@ func (l *GetMedalsLogic) GetMedals(req *types.GetMedalsReq) (resp *types.GetMeda
 
 	return &types.GetMedalsResp{
 		Medals:           list,
-		Proof:            proof,   // 如果没有资格，这里是空数组
-		ClaimableTokenId: claimId, // 如果没有资格，这里是 0
+		Proof:            proof,
+		ClaimableTokenId: claimId,
 	}, nil
 }

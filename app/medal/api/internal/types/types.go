@@ -13,6 +13,19 @@ type GetMedalsResp struct {
 	ClaimableTokenId uint64      `json:"claimableTokenId"`
 }
 
+type MedalDetailReq struct {
+	TokenId uint64 `path:"tokenId"`
+}
+
+type MedalDetailRes struct {
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	Image       string `json:"image"`
+	Type        string `json:"type"`
+	CreateTime  string `json:"createTime"`
+	TxHash      string `json:"txHash"`
+}
+
 type MedalInfo struct {
 	TokenId     uint64 `json:"tokenId"`
 	TxHash      string `json:"txHash"`

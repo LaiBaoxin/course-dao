@@ -26,9 +26,22 @@ message GetMedalProofResp {
   uint64 tokenId = 2;
 }
 
+message GetMedalByTokenIdReq {
+  uint64 tokenId = 1;
+}
+
+message MedalDetail {
+  uint64 tokenId = 1;
+  string txHash = 2;
+  uint64 blockNumber = 3;
+  string mintTime = 4;
+}
+
 service Medal {
   // 根据地址获取勋章列表
   rpc GetMedalsByAddress(GetMedalsReq) returns (GetMedalsResp);
   // 根据地址获取勋章证明
   rpc GetMedalProof(GetMedalProofReq) returns (GetMedalProofResp);
+  // 根据tokenId获取勋章详情
+  rpc GetMedalByTokenId(GetMedalByTokenIdReq) returns (MedalDetail);
 }

@@ -21,6 +21,7 @@ const _ = grpc.SupportPackageIsVersion9
 const (
 	Medal_GetMedalsByAddress_FullMethodName = "/medal.Medal/GetMedalsByAddress"
 	Medal_GetMedalProof_FullMethodName      = "/medal.Medal/GetMedalProof"
+	Medal_GetMedalByTokenId_FullMethodName  = "/medal.Medal/GetMedalByTokenId"
 )
 
 // MedalClient is the client API for Medal service.
@@ -31,6 +32,8 @@ type MedalClient interface {
 	GetMedalsByAddress(ctx context.Context, in *GetMedalsReq, opts ...grpc.CallOption) (*GetMedalsResp, error)
 	// 根据地址获取勋章证明
 	GetMedalProof(ctx context.Context, in *GetMedalProofReq, opts ...grpc.CallOption) (*GetMedalProofResp, error)
+	// 根据tokenId获取勋章详情
+	GetMedalByTokenId(ctx context.Context, in *GetMedalByTokenIdReq, opts ...grpc.CallOption) (*MedalDetail, error)
 }
 
 type medalClient struct {
@@ -61,6 +64,16 @@ func (c *medalClient) GetMedalProof(ctx context.Context, in *GetMedalProofReq, o
 	return out, nil
 }
 
+func (c *medalClient) GetMedalByTokenId(ctx context.Context, in *GetMedalByTokenIdReq, opts ...grpc.CallOption) (*MedalDetail, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(MedalDetail)
+	err := c.cc.Invoke(ctx, Medal_GetMedalByTokenId_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // MedalServer is the server API for Medal service.
 // All implementations must embed UnimplementedMedalServer
 // for forward compatibility.
@@ -69,6 +82,8 @@ type MedalServer interface {
 	GetMedalsByAddress(context.Context, *GetMedalsReq) (*GetMedalsResp, error)
 	// 根据地址获取勋章证明
 	GetMedalProof(context.Context, *GetMedalProofReq) (*GetMedalProofResp, error)
+	// 根据tokenId获取勋章详情
+	GetMedalByTokenId(context.Context, *GetMedalByTokenIdReq) (*MedalDetail, error)
 	mustEmbedUnimplementedMedalServer()
 }
 
@@ -84,6 +99,9 @@ func (UnimplementedMedalServer) GetMedalsByAddress(context.Context, *GetMedalsRe
 }
 func (UnimplementedMedalServer) GetMedalProof(context.Context, *GetMedalProofReq) (*GetMedalProofResp, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetMedalProof not implemented")
+}
+func (UnimplementedMedalServer) GetMedalByTokenId(context.Context, *GetMedalByTokenIdReq) (*MedalDetail, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetMedalByTokenId not implemented")
 }
 func (UnimplementedMedalServer) mustEmbedUnimplementedMedalServer() {}
 func (UnimplementedMedalServer) testEmbeddedByValue()               {}
@@ -142,6 +160,24 @@ func _Medal_GetMedalProof_Handler(srv interface{}, ctx context.Context, dec func
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Medal_GetMedalByTokenId_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetMedalByTokenIdReq)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(MedalServer).GetMedalByTokenId(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Medal_GetMedalByTokenId_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(MedalServer).GetMedalByTokenId(ctx, req.(*GetMedalByTokenIdReq))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // Medal_ServiceDesc is the grpc.ServiceDesc for Medal service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -156,6 +192,10 @@ var Medal_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetMedalProof",
 			Handler:    _Medal_GetMedalProof_Handler,
+		},
+		{
+			MethodName: "GetMedalByTokenId",
+			Handler:    _Medal_GetMedalByTokenId_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

@@ -19,6 +19,11 @@ func RegisterHandlers(server *rest.Server, serverCtx *svc.ServiceContext) {
 				Path:    "/v1/medals/:address",
 				Handler: GetMedalsHandler(serverCtx),
 			},
+			{
+				Method:  http.MethodGet,
+				Path:    "/v1/medals/detail/:tokenId",
+				Handler: GetMedalDetailHandler(serverCtx),
+			},
 		},
 	)
 }

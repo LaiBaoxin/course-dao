@@ -34,3 +34,9 @@ func (s *MedalServer) GetMedalProof(ctx context.Context, in *medal.GetMedalProof
 	l := logic.NewGetMedalProofLogic(ctx, s.svcCtx)
 	return l.GetMedalProof(in)
 }
+
+// 根据tokenId获取勋章详情
+func (s *MedalServer) GetMedalByTokenId(ctx context.Context, in *medal.GetMedalByTokenIdReq) (*medal.MedalDetail, error) {
+	l := logic.NewGetMedalByTokenIdLogic(ctx, s.svcCtx)
+	return l.GetMedalByTokenId(in)
+}

@@ -2,11 +2,10 @@ package utils
 
 import (
 	"bytes"
-	"math/big"
+	"encoding/binary"
 	"sort"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/common/math"
 	"github.com/ethereum/go-ethereum/crypto"
 )
 
@@ -24,17 +23,19 @@ type MerkleTree struct {
 }
 
 // HashLeaf 对齐 solidity 的 52字节
-func HashLeaf(account common.Address, tokenId uint64) []byte {
-	// 初始化缓冲区 52 字节
-	buf := make([]byte, 52)
-	// 放入 20 字节地址
-	copy(buf[0:20], account.Bytes())
-	// 放入 32 字节 uint256
-	idBig := new(big.Int).SetUint64(tokenId)
-	idBytes := math.U256Bytes(idBig)
-	copy(buf[20:52], idBytes)
+func HashLeaf(address string, tokenId uint64) []byte {
+	addr := common.HexToAddress(address)
 
-	return crypto.Keccak256(buf)
+	// uint256 在 EVM 中占 32 字节
+	tokenBuf := make([]byte, 32)
+	binary.BigEndian.PutUint64(tokenBuf[24:], tokenId) // 后 8 字节填充，前面补 0
+
+	// 拼接: 20字节地址 + 32字节数字 = 52字节
+	var data []byte
+	data = append(data, addr.Bytes()...)
+	data = append(data, tokenBuf...)
+
+	return crypto.Keccak256(data)
 }
 
 // NewMerkleTree 接收哈希后的叶子列表
@@ -43,10 +44,9 @@ func NewMerkleTree(leaves [][]byte) *MerkleTree {
 		return &MerkleTree{}
 	}
 
-	// 复制一份叶子并排序
+	// 保证 Root 的唯一性
 	sortedLeaves := make([][]byte, len(leaves))
 	copy(sortedLeaves, leaves)
-
 	sort.Slice(sortedLeaves, func(i, j int) bool {
 		return bytes.Compare(sortedLeaves[i], sortedLeaves[j]) < 0
 	})
@@ -54,21 +54,19 @@ func NewMerkleTree(leaves [][]byte) *MerkleTree {
 	var levels [][][]byte
 	levels = append(levels, sortedLeaves)
 
-	//  逐层向上构建
 	for len(levels[len(levels)-1]) > 1 {
 		prevLevel := levels[len(levels)-1]
 		var nextLevel [][]byte
 
 		for i := 0; i < len(prevLevel); i += 2 {
 			if i+1 < len(prevLevel) {
-				// 左右节点排序后合并哈希
 				h1, h2 := prevLevel[i], prevLevel[i+1]
+				// ⚖️ 左右排序合并（OpenZeppelin 标准）
 				if bytes.Compare(h1, h2) > 0 {
 					h1, h2 = h2, h1
 				}
 				nextLevel = append(nextLevel, crypto.Keccak256(append(h1, h2...)))
 			} else {
-				// 奇数节点提升
 				nextLevel = append(nextLevel, prevLevel[i])
 			}
 		}
@@ -86,7 +84,6 @@ func NewMerkleTree(leaves [][]byte) *MerkleTree {
 func (m *MerkleTree) GetProof(leaf []byte) [][]byte {
 	var proof [][]byte
 	idx := -1
-
 	for i, l := range m.leaves {
 		if bytes.Equal(l, leaf) {
 			idx = i
