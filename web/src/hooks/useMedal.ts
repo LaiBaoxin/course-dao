@@ -4,6 +4,8 @@ import { ethers } from 'ethers';
 import request from '../utils/request';
 import { CONTRACT_ADDRESS, MEDAL_ABI } from '../api/contract';
 import { App as AntdApp } from 'antd';
+import confetti from 'canvas-confetti';
+import { useAccount } from 'wagmi';
 
 export const useMedal = () => {
     const { message: msgApi, modal } = AntdApp.useApp();
@@ -13,6 +15,8 @@ export const useMedal = () => {
     const [claimId, setClaimId] = useState<number | null>(null);
     const [loading, setLoading] = useState(false);
 
+    const { address: wagmiAddress, isConnected } = useAccount();
+
     const clearState = useCallback(() => {
         setAccount('');
         setOwnedMedals([]);
@@ -20,18 +24,21 @@ export const useMedal = () => {
         setClaimId(null);
     }, []);
 
-    const fetchData = useCallback(async (address: string) => {
-        if (!address) return;
+    const fetchData = useCallback(async (rawAddress: string) => {
+        if (!rawAddress) return;
+
+        // 强制转为小写，防止因为 MetaMask 大小写校验和导致后端查不到数据
+        const address = rawAddress.toLowerCase();
+
         try {
-            const res: any = await request.get(`/v1/medals/${address}`);
-            // 初始化为空
+            const response: any = await request.get(`/v1/medals/${address}`);
+            const res = response.data ? response.data : response;
             const medals = res.medals || [];
             setOwnedMedals(medals);
 
-            // 如果领过了就不显示证明
             const isClaimed = medals.some((m: any) => Number(m.tokenId) === Number(res.claimableTokenId));
 
-            if (!isClaimed && res.proof?.length > 0) {
+            if (!isClaimed && res.proof && res.proof.length > 0) {
                 setProof(res.proof);
                 setClaimId(res.claimableTokenId);
             } else {
@@ -44,48 +51,18 @@ export const useMedal = () => {
     }, []);
 
     useEffect(() => {
-        const eth = window.ethereum as any;
-        if (eth && eth.on) {
-            const handleAccountsChanged = (accounts: string[]) => {
-                if (accounts.length > 0) {
-                    setAccount(accounts[0]);
-                    fetchData(accounts[0]);
-                } else {
-                    clearState();
-                }
-            };
-            const handleChainChanged = () => window.location.reload();
-            eth.on('accountsChanged', handleAccountsChanged);
-            eth.on('chainChanged', handleChainChanged);
-            return () => {
-                eth.removeListener('accountsChanged', handleAccountsChanged);
-                eth.removeListener('chainChanged', handleChainChanged);
-            };
-        }
-    }, [fetchData, clearState]);
+        const token = localStorage.getItem('course_dao_jwt');
 
-    const connectWallet = async () => {
-        if (!window.ethereum) {
-            msgApi.error({ content: '请安装 MetaMask 钱包' });
-            return;
+        if (isConnected && wagmiAddress && token) {
+            setAccount(wagmiAddress);
+            fetchData(wagmiAddress); // 发起真正的网络请求！
+        } else if (!isConnected || !token) {
+            // 如果钱包断开或没有登录，清空状态
+            clearState();
         }
-        try {
-            const provider = new ethers.BrowserProvider(window.ethereum as any);
-            const accounts = await provider.send("eth_requestAccounts", []);
-            setAccount(accounts[0]);
-            fetchData(accounts[0]);
-        } catch (err) {
-            msgApi.warning({ content: '连接已取消' });
-        }
-    };
-
-    const disconnectWallet = () => {
-        clearState();
-        msgApi.info({ content: '已断开钱包连接' });
-    };
+    }, [isConnected, wagmiAddress, fetchData, clearState]);
 
     const handleClaim = async () => {
-        // claimId 的合法性深度校验
         if (proof.length === 0 || claimId === null || claimId === 0) {
             msgApi.warning({ content: '申领凭证无效，请确保您在白名单中' });
             return;
@@ -106,7 +83,6 @@ export const useMedal = () => {
                     const signer = await provider.getSigner();
                     const contract = new ethers.Contract(CONTRACT_ADDRESS, MEDAL_ABI, signer);
 
-                    // 在发送交易前再次确认 root 状态（防御 revert）
                     const rootOnChain = await contract.merkleRoot();
                     if (rootOnChain === ethers.ZeroHash) {
                         throw new Error("合约 Merkle Root 未初始化，请联系管理员运行 set_root.go");
@@ -117,6 +93,15 @@ export const useMedal = () => {
 
                     await tx.wait();
                     msgApi.success({ content: `🎉 领取成功！ID: #${claimId}` });
+
+                    // 触发全屏烟花效果
+                    confetti({
+                        zIndex: 9999,
+                        particleCount: 150,
+                        spread: 100,
+                        origin: { y: 0.5 },
+                        colors: ['#fadb14', '#1890ff', '#52c41a', '#ff4d4f']
+                    });
 
                     setProof([]);
                     setClaimId(null);
@@ -136,5 +121,5 @@ export const useMedal = () => {
         });
     };
 
-    return { account, ownedMedals, proof, claimId, loading, connectWallet, disconnectWallet, handleClaim };
+    return { account, ownedMedals, proof, claimId, loading, handleClaim };
 };

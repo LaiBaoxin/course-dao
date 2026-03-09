@@ -9,11 +9,13 @@ const request = axios.create({
 // 请求拦截器
 request.interceptors.request.use(
     (config) => {
+        const token = localStorage.getItem('course_dao_jwt');
+        if (token) {
+            config.headers.Authorization = `Bearer ${token}`;
+        }
         return config;
     },
-    (error) => {
-        return Promise.reject(error);
-    }
+    (error) => Promise.reject(error)
 );
 
 // 响应拦截器
