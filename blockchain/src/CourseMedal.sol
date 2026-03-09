@@ -7,10 +7,7 @@ import { MerkleProof } from "@openzeppelin/contracts/utils/cryptography/MerklePr
 import { ERC721Votes } from "@openzeppelin/contracts/token/ERC721/extensions/ERC721Votes.sol";
 import { EIP712 } from "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
 
-/**
- * @title CourseMedal (Restored Version)
- * @dev 已经修复了误以为是 ERC721Votes 导致的 Anvil StackOverflow 问题
- */
+
 contract CourseMedal is ERC721, EIP712, ERC721Votes, Ownable {
     bytes32 public merkleRoot;
     mapping(address => bool) public hasClaimed;
@@ -24,7 +21,7 @@ contract CourseMedal is ERC721, EIP712, ERC721Votes, Ownable {
         Ownable(msg.sender) 
     {}
 
-    // The following functions are overrides required by Solidity.
+    // 重新实现 ERC721Votes 的相关函数，确保不会调用到导致 StackOverflow 的代码路径
     function _update(address to, uint256 tokenId, address auth)
         internal
         override(ERC721, ERC721Votes)
@@ -40,6 +37,7 @@ contract CourseMedal is ERC721, EIP712, ERC721Votes, Ownable {
         super._increaseBalance(account, value);
     }
 
+    // 铸造函数，允许合约所有者铸造新的 CourseMedal 
     function safeMint(address to) public onlyOwner {
         uint256 tokenId = _nextTokenId++;
         _safeMint(to, tokenId);
