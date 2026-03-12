@@ -2,6 +2,7 @@ import React, { useEffect } from 'react';
 import { Modal, Form, Input, InputNumber, message } from 'antd';
 import { useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
 import { governanceABI } from '../api/governance.ts';
+import { parseEther } from 'viem';
 
 const CONTRACT_ADDRESS = '0x3761b1F7f037318C018Ba5C5D473Ea92799B4Db5' as `0x${string}`;
 
@@ -41,6 +42,7 @@ const ProposeModal: React.FC<ProposeModalProps> = ({ visible, onCancel, onSucces
     const handleSubmit = async () => {
         try {
             const values = await form.validateFields();
+            const amountInWei = parseEther(values.amount.toString());
 
             writeContract({
                 address: CONTRACT_ADDRESS,
@@ -48,7 +50,7 @@ const ProposeModal: React.FC<ProposeModalProps> = ({ visible, onCancel, onSucces
                 functionName: 'propose',
                 args: [
                     values.description,
-                    BigInt(values.amount || 0),
+                    amountInWei,
                     values.receiver as `0x${string}`
                 ],
             });
