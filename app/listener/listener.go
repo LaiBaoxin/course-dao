@@ -183,10 +183,15 @@ func processEvent(conn clickhouse.Conn, vLog types.Log, medalAddr, vaultAddr com
 				Receiver common.Address
 				Amount   *big.Int
 			}
+			// 解析合约数据
 			_ = vaultAbi.UnpackIntoInterface(&event, "Executed", vLog.Data)
 			query := `INSERT INTO course_dao.proposal_executed_events (pid, receiver, amount, tx_hash, block_number) VALUES (?, ?, ?, ?, ?)`
-			_ = conn.Exec(ctx, query, pid, event.Receiver.Hex(), event.Amount.String(), txHash, vLog.BlockNumber)
-			log.Printf("[执行] ID:%s | 接收人:%s", pid, event.Receiver.Hex()[:8])
+			err := conn.Exec(ctx, query, pid, event.Receiver.Hex(), event.Amount.String(), txHash, vLog.BlockNumber)
+			if err != nil {
+				log.Printf("- [执行] 写入 ClickHouse 失败: %v", err)
+			} else {
+				log.Printf("- [执行] ID:%s | 数据已入库", pid)
+			}
 		}
 	}
 }
