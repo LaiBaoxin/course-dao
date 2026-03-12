@@ -1,7 +1,9 @@
 Eth:
   WSRpc: "wss://eth-sepolia.g.alchemy.com/v2/h81_NhzDAZa0CosfZKdur"
   ContractAddress: "0xdD782fB0cf54970F1706c4E8fE5EA1f64d13A524"
+  VaultAddress: "0xb950F2838F59c8cbC0C4a97ED1C24358148ea4D2"
   StartBlock: 10416000
+  VaultStartBlock: 10431470
 ClickHouse:
   Addr:
     - "127.0.0.1:9000"

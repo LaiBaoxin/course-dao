@@ -10,126 +10,175 @@ import (
 
 	"github.com/ClickHouse/clickhouse-go/v2"
 	"github.com/ethereum/go-ethereum"
+	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/ethclient"
-	"github.com/zeromicro/go-zero/core/conf"
-
 	"github.com/wwater/course-dao/app/listener/config"
+	"github.com/zeromicro/go-zero/core/conf"
 )
 
-var configFile = flag.String("f", "etc/listener.yaml", "the config file")
-var logTransferSig = common.HexToHash("0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef")
+var (
+	configFile = flag.String("f", "etc/listener.yaml", "the config file")
+
+	sigTransfer        = common.HexToHash("0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef")
+	sigProposalCreated = common.HexToHash("0x71869e97c9b2079093375865230985220c4228c2ea66e6b4e6d4e101f3b0e352")
+	sigVoted           = common.HexToHash("0x16f9a6566d214a1c5180f6f4c89283f6f1406e90647a544a49685a113f86e379")
+	sigExecuted        = common.HexToHash("0x4037996c9e0568c005a74e5033c46e053a473d09252327092120407f354f9a76")
+)
+
+const vaultABIJson = `[{"anonymous":false,"inputs":[{"indexed":true,"name":"pid","type":"uint256"},{"name":"desc","type":"string"},{"name":"amount","type":"uint256"},{"name":"receiver","type":"address"}],"name":"ProposalCreated","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"name":"pid","type":"uint256"},{"name":"voter","type":"address"},{"name":"weight","type":"uint256"}],"name":"Voted","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"name":"pid","type":"uint256"},{"name":"receiver","type":"address"},{"name":"amount","type":"uint256"}],"name":"Executed","type":"event"}]`
 
 func main() {
 	flag.Parse()
-
 	var c config.Config
 	conf.MustLoad(*configFile, &c)
 
 	conn, err := clickhouse.Open(&clickhouse.Options{
-		Addr: c.ClickHouse.Addr,
-		Auth: clickhouse.Auth{
-			Database: c.ClickHouse.Database,
-			Username: c.ClickHouse.Username,
-			Password: c.ClickHouse.Password,
-		},
+		Addr:        c.ClickHouse.Addr,
+		Auth:        clickhouse.Auth{Database: c.ClickHouse.Database, Username: c.ClickHouse.Username, Password: c.ClickHouse.Password},
 		DialTimeout: 5 * time.Second,
 	})
 	if err != nil {
-		log.Fatalf("ClickHouse 连接失败: %v", err)
+		log.Fatalf("ClickHouse 失败: %v", err)
 	}
 
 	client, err := ethclient.Dial(c.Eth.WSRpc)
 	if err != nil {
-		log.Fatalf("以太坊节点连接失败: %v", err)
+		log.Fatalf("Eth 失败: %v", err)
 	}
+	vaultAbi, _ := abi.JSON(strings.NewReader(vaultABIJson))
 
-	contractAddr := common.HexToAddress(c.Eth.ContractAddress)
+	medalAddr := common.HexToAddress(c.Eth.ContractAddress)
+	vaultAddr := common.HexToAddress(c.Eth.VaultAddress)
 
-	// 一次性请求区块进行限制
-	targetBlock := uint64(10431202)
-	historyQuery := ethereum.FilterQuery{
-		FromBlock: big.NewInt(int64(targetBlock - 1)),
-		ToBlock:   big.NewInt(int64(targetBlock + 1)),
-		Addresses: []common.Address{contractAddr},
-		Topics:    [][]common.Hash{{logTransferSig}},
-	}
-
-	log.Printf("开始精准同步历史数据，区块范围: %d - %d", targetBlock-1, targetBlock+1)
-	historicalLogs, err := client.FilterLogs(context.Background(), historyQuery)
+	// 先获取当前区块高度，作为历史同步的终点和实时监听的逻辑起点
+	header, err := client.HeaderByNumber(context.Background(), nil)
 	if err != nil {
-		log.Fatalf("同步历史数据失败: %v", err)
+		log.Fatalf("获取最新区块失败: %v", err)
 	}
+	currentBlock := header.Number.Uint64()
 
-	count := 0
-	for _, l := range historicalLogs {
-		if inserted := processLog(conn, l); inserted {
-			count++
-		}
-	}
-	log.Printf("历史补录完成，新入库数量: %d", count)
+	batchSize := uint64(10)
 
-	// 实时监听：从最新区块开始监控未来事件
-	realtimeQuery := ethereum.FilterQuery{
-		Addresses: []common.Address{contractAddr},
-		Topics:    [][]common.Hash{{logTransferSig}},
+	go func() {
+		log.Println("[Medal] 历史补录协程已启动")
+		syncHistory(client, conn, medalAddr, uint64(c.Eth.StartBlock), currentBlock, []common.Hash{sigTransfer}, vaultAbi, medalAddr, vaultAddr, batchSize)
+		log.Println("[Medal] 历史补录完成")
+	}()
+
+	go func() {
+		log.Println("[Vault] 历史补录协程已启动")
+		syncHistory(client, conn, vaultAddr, uint64(c.Eth.VaultStartBlock), currentBlock, []common.Hash{sigProposalCreated, sigVoted, sigExecuted}, vaultAbi, medalAddr, vaultAddr, batchSize)
+		log.Println("[Vault] 历史补录完成")
+	}()
+
+	// 主线程开启实时监听
+	query := ethereum.FilterQuery{
+		Addresses: []common.Address{medalAddr, vaultAddr},
+		Topics:    [][]common.Hash{{sigTransfer, sigProposalCreated, sigVoted, sigExecuted}},
 	}
 
 	logs := make(chan types.Log)
-	sub, err := client.SubscribeFilterLogs(context.Background(), realtimeQuery, logs)
+	sub, err := client.SubscribeFilterLogs(context.Background(), query, logs)
 	if err != nil {
-		log.Fatalf("开启实时监听失败: %v", err)
+		log.Fatalf("订阅实时监听失败: %v", err)
 	}
 
-	log.Printf("实时监听已启动，正在监控合约: %s", c.Eth.ContractAddress)
+	log.Printf("实时监听已就绪 | 当前高度: %d", currentBlock)
 
 	for {
 		select {
 		case err := <-sub.Err():
-			log.Printf("连接异常中断: %v", err)
+			log.Printf("连接中断，尝试重启: %v", err)
 			return
 		case vLog := <-logs:
-			processLog(conn, vLog)
+			processEvent(conn, vLog, medalAddr, vaultAddr, vaultAbi)
 		}
 	}
 }
 
-func processLog(conn clickhouse.Conn, vLog types.Log) bool {
-	if len(vLog.Topics) < 4 || vLog.Topics[0] != logTransferSig {
-		return false
+// syncHistory 同步历史数据
+func syncHistory(client *ethclient.Client, conn clickhouse.Conn, addr common.Address, start, end uint64, topics []common.Hash, vAbi abi.ABI, mAddr, vAddr common.Address, batchSize uint64) {
+	if start > end {
+		return
 	}
+	for from := start; from <= end; from += batchSize {
+		to := from + batchSize - 1
+		if to > end {
+			to = end
+		}
 
+		q := ethereum.FilterQuery{
+			FromBlock: big.NewInt(int64(from)),
+			ToBlock:   big.NewInt(int64(to)),
+			Addresses: []common.Address{addr},
+			Topics:    [][]common.Hash{topics},
+		}
+
+		histLogs, err := client.FilterLogs(context.Background(), q)
+		if err != nil {
+			log.Printf(" 范围 [%d - %d] 同步失败 (RPC限制), 稍后重试...", from, to)
+			time.Sleep(1 * time.Second)
+			continue
+		}
+
+		for _, l := range histLogs {
+			processEvent(conn, l, mAddr, vAddr, vAbi)
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
+}
+
+// processEvent 事件处理
+func processEvent(conn clickhouse.Conn, vLog types.Log, medalAddr, vaultAddr common.Address, vaultAbi abi.ABI) {
+	ctx := context.Background()
 	txHash := vLog.TxHash.Hex()
 
-	var exists uint64
-	checkQuery := "SELECT count() FROM course_dao.medal_mint_events WHERE transaction_hash = ?"
-	if err := conn.QueryRow(context.Background(), checkQuery, txHash).Scan(&exists); err != nil {
-		log.Printf("查询数据库失败: %v", err)
-		return false
-	}
-	if exists > 0 {
-		return false
-	}
-
-	toAddress := strings.ToLower(common.HexToAddress(vLog.Topics[2].Hex()).Hex())
-	tokenId := new(big.Int).SetBytes(vLog.Topics[3].Bytes()).Uint64()
-
-	insertQuery := `INSERT INTO course_dao.medal_mint_events (token_id, to_address, transaction_hash, block_number, minted_at) 
-              VALUES (?, ?, ?, ?, now())`
-
-	err := conn.Exec(context.Background(), insertQuery,
-		tokenId,
-		toAddress,
-		txHash,
-		vLog.BlockNumber,
-	)
-
-	if err != nil {
-		log.Printf("写入失败 [TX: %s]: %v", txHash[:10], err)
-		return false
+	if vLog.Address == medalAddr && vLog.Topics[0] == sigTransfer {
+		if len(vLog.Topics) < 4 {
+			return
+		}
+		toAddr := strings.ToLower(common.HexToAddress(vLog.Topics[2].Hex()).Hex())
+		tokenId := new(big.Int).SetBytes(vLog.Topics[3].Bytes()).Uint64()
+		query := `INSERT INTO course_dao.medal_mint_events (token_id, to_address, transaction_hash, block_number, minted_at) VALUES (?, ?, ?, ?, now())`
+		_ = conn.Exec(ctx, query, tokenId, toAddr, txHash, vLog.BlockNumber)
+		log.Printf("✨ [勋章] #%d -> %s", tokenId, toAddr[:8])
 	}
 
-	log.Printf("勋章成功入库: #%d -> %s", tokenId, toAddress)
-	return true
+	if vLog.Address == vaultAddr {
+		pid := vLog.Topics[1].Big().String()
+		switch vLog.Topics[0] {
+		case sigProposalCreated: // 提案
+			var event struct {
+				Desc     string
+				Amount   *big.Int
+				Receiver common.Address
+			}
+			if err := vaultAbi.UnpackIntoInterface(&event, "ProposalCreated", vLog.Data); err != nil {
+				return
+			}
+			query := `INSERT INTO course_dao.proposal_created_events (pid, proposer, description, amount, receiver, tx_hash, block_number) VALUES (?, ?, ?, ?, ?, ?, ?)`
+			_ = conn.Exec(ctx, query, pid, "", event.Desc, event.Amount.String(), event.Receiver.Hex(), txHash, vLog.BlockNumber)
+			log.Printf("[提案] ID:%s | 金额:%s", pid, event.Amount.String())
+		case sigVoted: // 投票
+			var event struct {
+				Voter  common.Address
+				Weight *big.Int
+			}
+			_ = vaultAbi.UnpackIntoInterface(&event, "Voted", vLog.Data)
+			query := `INSERT INTO course_dao.vote_events (pid, voter, weight, tx_hash, block_number) VALUES (?, ?, ?, ?, ?)`
+			_ = conn.Exec(ctx, query, pid, event.Voter.Hex(), event.Weight.String(), txHash, vLog.BlockNumber)
+			log.Printf("[投票] ID:%s | 投票人:%s", pid, event.Voter.Hex()[:8])
+		case sigExecuted: // 执行
+			var event struct {
+				Receiver common.Address
+				Amount   *big.Int
+			}
+			_ = vaultAbi.UnpackIntoInterface(&event, "Executed", vLog.Data)
+			query := `INSERT INTO course_dao.proposal_executed_events (pid, receiver, amount, tx_hash, block_number) VALUES (?, ?, ?, ?, ?)`
+			_ = conn.Exec(ctx, query, pid, event.Receiver.Hex(), event.Amount.String(), txHash, vLog.BlockNumber)
+			log.Printf("[执行] ID:%s | 接收人:%s", pid, event.Receiver.Hex()[:8])
+		}
+	}
 }
