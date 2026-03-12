@@ -3,6 +3,14 @@
 
 package types
 
+type CourseReq struct {
+}
+
+type CourseResp struct {
+	VideoUrl string `json:"video_url"`
+	Title    string `json:"title"`
+}
+
 type GetMedalsReq struct {
 	Address string `path:"address"`
 }

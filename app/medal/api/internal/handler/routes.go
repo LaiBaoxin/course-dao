@@ -7,6 +7,7 @@ import (
 	"net/http"
 
 	auth "github.com/wwater/course-dao/app/medal/api/internal/handler/auth"
+	course "github.com/wwater/course-dao/app/medal/api/internal/handler/course"
 	"github.com/wwater/course-dao/app/medal/api/internal/svc"
 
 	"github.com/zeromicro/go-zero/rest"
@@ -44,5 +45,21 @@ func RegisterHandlers(server *rest.Server, serverCtx *svc.ServiceContext) {
 			},
 		},
 		rest.WithPrefix("/v1/auth"),
+	)
+
+	server.AddRoutes(
+		rest.WithMiddlewares(
+			[]rest.Middleware{serverCtx.CheckMedalMiddleware},
+			[]rest.Route{
+				{
+					// 获取高级课程视频 (仅限 Course DAO 勋章持有者)
+					Method:  http.MethodGet,
+					Path:    "/premium",
+					Handler: course.GetPremiumCourseHandler(serverCtx),
+				},
+			}...,
+		),
+		rest.WithJwt(serverCtx.Config.Auth.AccessSecret),
+		rest.WithPrefix("/v1/course"),
 	)
 }

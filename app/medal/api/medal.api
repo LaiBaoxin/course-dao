@@ -89,5 +89,8 @@ service medal-api {
 	@doc "获取高级课程视频 (仅限 Course DAO 勋章持有者)"
 	@handler getPremiumCourse
 	get /premium (CourseReq) returns (CourseResp)
+
+	@handler GetMedalProof
+    get /v1/medals/:address (GetMedalProofReq) returns (GetMedalProofResp)
 }
 
