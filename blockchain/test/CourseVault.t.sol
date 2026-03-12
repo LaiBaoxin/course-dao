@@ -8,8 +8,9 @@ import {CourseVault} from "../src/CourseVault.sol";
 contract CourseVaultTest is Test {
     CourseMedal medal;
     CourseVault vault;
-    address student = address(100);
-    address teacher = address(200);
+    
+    address student = makeAddr("student");
+    address teacher = makeAddr("teacher");
 
     function setUp() public {
         medal = new CourseMedal();
@@ -17,37 +18,47 @@ contract CourseVaultTest is Test {
         vm.deal(address(vault), 10 ether);
     }
 
-    // 让测试合约有收钱的能力
     receive() external payable {}
 
     function testGovernanceFlow() public {
-        // 1. 发放勋章
+        // 激活投票权
         medal.safeMint(student);
-
-        // 学生必须委托给自己才能激活投票权快照
         vm.prank(student);
         medal.delegate(student);
+        vm.roll(block.number + 1);
 
-        // 推进区块以确保委托生效并产生 Checkpoint
-        vm.roll(block.number + 1); 
-
-        // 2. 发起提案
-        vm.prank(teacher);
-        vault.createProposal("Buy Servers", 1 ether);
-        
-        vm.roll(block.number + 1); 
-
-        // 3. 学生投票
+        // 发起提案
         vm.prank(student);
-        vault.vote(0);
+        vault.createProposal("Funding", 1 ether, payable(teacher));
+        uint256 pid = 0;
 
-        // 4. 验证执行: 明确谁来领取这笔钱
-        uint256 beforeBalance = teacher.balance;
-        vm.prank(teacher); // 老师去执行提案领取资金
-        vault.execute(0);
+        // 模拟多人投票以达到 Quorum (3票)
+        _setupMultipleVoters(pid);
 
-        // 5. 最终断言
-        assertEq(address(vault).balance, 9 ether);
-        assertEq(teacher.balance, beforeBalance + 1 ether);
+        // 执行并验证
+        uint256 balBefore = teacher.balance;
+        vault.execute(pid);
+
+        // 断言检查
+       (,,,,,, bool executed) = vault.getProposal(pid);
+
+        assertTrue(executed, "Proposal should be marked as executed");
+        assertEq(teacher.balance, balBefore + 1 ether, "Teacher did not receive funds");
+    }
+
+    // 测试多投票的结果
+    function _setupMultipleVoters(uint256 pid) internal {
+        for(uint160 i = 1; i <= 3; i++) {
+            address v = address(i + 1000);
+            medal.safeMint(v);
+            vm.prank(v);
+            medal.delegate(v);
+        }
+        vm.roll(block.number + 1);
+        for(uint160 i = 1; i <= 3; i++) {
+            address v = address(i + 1000);
+            vm.prank(v);
+            vault.vote(pid);
+        }
     }
 }
