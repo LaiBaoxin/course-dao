@@ -1,0 +1,8 @@
+Name: course-api
+Host: 0.0.0.0
+Port: 8889
+ClickHouse:
+  DataSource: "clickhouse://admin:123456@127.0.0.1:9000/course_dao"
+Auth:
+  AccessSecret: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE3NzMzODE4OTYsImlhdCI6MTc3MzI5NTQ5Niwid2FsbGV0IjoiMHg4NkNBMzIwNkEwQjUxOTE0Yjk0NTlBQURhM0I3MEI2ZWUzZjJkOTgzIn0.5p9DHTSouMWks5IRqUhDn7kurOp-M3zuDk8XyMRu-vY"
+  AccessExpire: 86400

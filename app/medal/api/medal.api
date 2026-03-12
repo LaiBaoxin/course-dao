@@ -1,96 +1,69 @@
 syntax = "v1"
 
 type (
-	GetMedalsReq {
-		Address string `path:"address"`
-	}
-	MedalInfo {
-		TokenId     uint64 `json:"tokenId"`
-		TxHash      string `json:"txHash"`
-		BlockNumber uint64 `json:"blockNumber"`
-	}
-	GetMedalsResp {
-		Medals           []MedalInfo `json:"medals"`
-		Proof            []string    `json:"proof"`
-		ClaimableTokenId uint64      `json:"claimableTokenId"`
-	}
-)
+    // 登录认证
+    NonceReq {
+        Address string `json:"address"`
+    }
+    NonceResp {
+        Nonce string `json:"nonce"`
+    }
+    LoginReq {
+        Address   string `json:"address"`
+        Message   string `json:"message"`
+        Signature string `json:"signature"`
+    }
+    LoginResp {
+        Token string `json:"token"`
+    }
 
-type (
-	MedalDetailReq {
-		TokenId uint64 `path:"tokenId"`
-	}
-	MedalDetailRes {
-		Name        string `json:"name"`
-		Description string `json:"description"`
-		Image       string `json:"image"`
-		Type        string `json:"type"`
-		CreateTime  string `json:"createTime"`
-		TxHash      string `json:"txHash"`
-	}
-)
-
-service medal-api {
-	@handler GetMedals
-	get /v1/medals/:address (GetMedalsReq) returns (GetMedalsResp)
-
-	@handler GetMedalDetail
-	get /v1/medals/detail/:tokenId (MedalDetailReq) returns (MedalDetailRes)
-}
-
-// 登录服务相关的内容
-type (
-	NonceReq {
-		Address string `json:"address"`
-	}
-	NonceResp {
-		Nonce string `json:"nonce"`
-	}
-	LoginReq {
-		Address   string `json:"address"`
-		Message   string `json:"message"`
-		Signature string `json:"signature"`
-	}
-	LoginResp {
-		Token string `json:"token"`
-	}
+    // 勋章查询
+    GetMedalsReq {
+        Address string `path:"address"`
+    }
+    MedalInfo {
+        TokenId     uint64 `json:"tokenId"`
+        TxHash      string `json:"txHash"`
+        BlockNumber uint64 `json:"blockNumber"`
+    }
+    GetMedalsResp {
+        Medals           []MedalInfo `json:"medals"`
+        Proof            []string    `json:"proof"`
+        ClaimableTokenId uint64      `json:"claimableTokenId"`
+    }
+    MedalDetailReq {
+        TokenId uint64 `path:"tokenId"`
+    }
+    MedalDetailRes {
+        Name        string `json:"name"`
+        Description string `json:"description"`
+        Image       string `json:"image"`
+        Type        string `json:"type"`
+        CreateTime  string `json:"createTime"`
+        TxHash      string `json:"txHash"`
+    }
 )
 
 @server (
-	prefix: /v1/auth
-	group:  auth
+    prefix: /v1/auth
+    group:  auth
 )
 service medal-api {
-	@doc "获取登录随机数"
-	@handler getNonce
-	post /nonce (NonceReq) returns (NonceResp)
+    @handler getNonce
+    post /nonce (NonceReq) returns (NonceResp)
 
-	@doc "钱包签名登录"
-	@handler login
-	post /login (LoginReq) returns (LoginResp)
+    @handler login
+    post /login (LoginReq) returns (LoginResp)
 }
 
-type (
-	CourseReq  {}
-	CourseResp {
-		VideoUrl string `json:"video_url"`
-		Title    string `json:"title"`
-	}
-)
-
-// --- 加锁的路由区 ---
 @server (
-	prefix:     /v1/course
-	group:      course
-	jwt:        Auth // 开启 Go-Zero 内置的 JWT 解析
-	middleware: CheckMedalMiddleware // 挂载自定义的勋章查验锁
+    prefix: /v1/medals
+    group:  medal
 )
 service medal-api {
-	@doc "获取高级课程视频 (仅限 Course DAO 勋章持有者)"
-	@handler getPremiumCourse
-	get /premium (CourseReq) returns (CourseResp)
+    @handler GetMedals
+    get /list/:address (GetMedalsReq) returns (GetMedalsResp)
 
-	@handler GetMedalProof
-    get /v1/medals/:address (GetMedalProofReq) returns (GetMedalProofResp)
+    @handler GetMedalDetail
+    get /detail/:tokenId (MedalDetailReq) returns (MedalDetailRes)
 }
-

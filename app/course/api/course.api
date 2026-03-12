@@ -1,0 +1,47 @@
+syntax = "v1"
+
+type (
+	CourseReq  {}
+	CourseResp {
+		VideoUrl string `json:"video_url"`
+		Title    string `json:"title"`
+	}
+	Proposal {
+		Id          string `json:"id"`
+		Proposer    string `json:"proposer"`
+		Description string `json:"description"`
+		Amount      string `json:"amount"`
+		Receiver    string `json:"receiver"`
+		VotesFor    string `json:"votesFor"`
+		Executed    bool   `json:"executed"`
+		Deadline    int64  `json:"deadline"`
+	}
+	ListProposalsReq {
+		Page uint32 `form:"page,optional"`
+		Size uint32 `form:"size,optional"`
+	}
+	ListProposalsResp {
+		List []Proposal `json:"list"`
+	}
+)
+
+@server (
+	prefix:     /v1/course
+	group:      course
+	jwt:        Auth
+	middleware: CheckMedalMiddleware
+)
+service course-api {
+	@handler getPremiumCourse
+	get /premium (CourseReq) returns (CourseResp)
+}
+
+@server (
+	prefix: /v1/governance
+	group:  governance
+)
+service course-api {
+	@handler ListProposals
+	get /proposals (ListProposalsReq) returns (ListProposalsResp)
+}
+
