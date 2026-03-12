@@ -46,14 +46,18 @@ func main() {
 	}
 
 	contractAddr := common.HexToAddress(c.Eth.ContractAddress)
-	query := ethereum.FilterQuery{
-		FromBlock: big.NewInt(int64(c.Eth.StartBlock)),
+
+	// 一次性请求区块进行限制
+	targetBlock := uint64(10431202)
+	historyQuery := ethereum.FilterQuery{
+		FromBlock: big.NewInt(int64(targetBlock - 1)),
+		ToBlock:   big.NewInt(int64(targetBlock + 1)),
 		Addresses: []common.Address{contractAddr},
 		Topics:    [][]common.Hash{{logTransferSig}},
 	}
 
-	// 静默同步历史数据
-	historicalLogs, err := client.FilterLogs(context.Background(), query)
+	log.Printf("开始精准同步历史数据，区块范围: %d - %d", targetBlock-1, targetBlock+1)
+	historicalLogs, err := client.FilterLogs(context.Background(), historyQuery)
 	if err != nil {
 		log.Fatalf("同步历史数据失败: %v", err)
 	}
@@ -64,18 +68,21 @@ func main() {
 			count++
 		}
 	}
-	if count > 0 {
-		log.Printf("成功同步 %d 条历史勋章记录", count)
+	log.Printf("历史补录完成，新入库数量: %d", count)
+
+	// 实时监听：从最新区块开始监控未来事件
+	realtimeQuery := ethereum.FilterQuery{
+		Addresses: []common.Address{contractAddr},
+		Topics:    [][]common.Hash{{logTransferSig}},
 	}
 
-	// 开启实时监听
 	logs := make(chan types.Log)
-	sub, err := client.SubscribeFilterLogs(context.Background(), query, logs)
+	sub, err := client.SubscribeFilterLogs(context.Background(), realtimeQuery, logs)
 	if err != nil {
 		log.Fatalf("开启实时监听失败: %v", err)
 	}
 
-	log.Printf("服务启动成功，正在监控合约: %s", c.Eth.ContractAddress)
+	log.Printf("实时监听已启动，正在监控合约: %s", c.Eth.ContractAddress)
 
 	for {
 		select {
@@ -95,21 +102,19 @@ func processLog(conn clickhouse.Conn, vLog types.Log) bool {
 
 	txHash := vLog.TxHash.Hex()
 
-	// 防止重复插入
 	var exists uint64
 	checkQuery := "SELECT count() FROM course_dao.medal_mint_events WHERE transaction_hash = ?"
 	if err := conn.QueryRow(context.Background(), checkQuery, txHash).Scan(&exists); err != nil {
 		log.Printf("查询数据库失败: %v", err)
 		return false
 	}
-	if exists > 0 { // 数据已存在，跳过
+	if exists > 0 {
 		return false
 	}
 
 	toAddress := strings.ToLower(common.HexToAddress(vLog.Topics[2].Hex()).Hex())
 	tokenId := new(big.Int).SetBytes(vLog.Topics[3].Bytes()).Uint64()
 
-	// 构建插入语句
 	insertQuery := `INSERT INTO course_dao.medal_mint_events (token_id, to_address, transaction_hash, block_number, minted_at) 
               VALUES (?, ?, ?, ?, now())`
 
@@ -125,6 +130,6 @@ func processLog(conn clickhouse.Conn, vLog types.Log) bool {
 		return false
 	}
 
-	log.Printf("新勋章入库: #%d -> %s...", tokenId, toAddress[:10])
+	log.Printf("勋章成功入库: #%d -> %s", tokenId, toAddress)
 	return true
 }
