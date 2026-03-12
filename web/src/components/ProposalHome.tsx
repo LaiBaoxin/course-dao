@@ -1,87 +1,147 @@
-import React, { useEffect, useState } from 'react';
-import { Card, Table, Tag, Typography, Spin, message } from 'antd';
+import React, { useEffect, useState, useCallback } from 'react';
+import { Card, Table, Tag, Typography, message, Button, Space } from 'antd';
 import { getProposals } from '../api/governance';
 import type { Proposal } from '../api/types';
+import { useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
+import { governanceABI } from '../api/governance.ts';
 
 const { Title } = Typography;
+
+// Remix 中最新的合约地址
+const CONTRACT_ADDRESS = '0x3761b1F7f037318C018Ba5C5D473Ea92799B4Db5' as `0x${string}`;
 
 const ProposalHome: React.FC = () => {
     const [proposals, setProposals] = useState<Proposal[]>([]);
     const [loading, setLoading] = useState<boolean>(true);
+    const [activeId, setActiveId] = useState<string | null>(null);
 
-    // 请求后端接口获取提案列表
-    const fetchProposals = async () => {
+    // Wagmi 写入钩子
+    const { writeContract, data: hash, isPending: isWalletPending } = useWriteContract();
+
+    // 监听交易结果
+    const { isSuccess: isConfirming, isLoading: isTxLoading } = useWaitForTransactionReceipt({ hash });
+
+    const fetchData = useCallback(async () => {
         try {
             setLoading(true);
-            // 调用 api
             const res = await getProposals();
-            console.log("获取提案列表成功:", res)
-            if (res && res) {
-                setProposals(res.list);
+            const actualData = (res as any).data ? (res as any).data : res;
+            if (actualData && actualData.list) {
+                setProposals(actualData.list);
             }
-        } catch (error) {
-            console.error("获取提案失败:", error);
-            message.error("获取提案列表失败");
+        } catch (e) {
+            message.error("获取数据失败");
         } finally {
             setLoading(false);
         }
-    };
-
-    useEffect(() => {
-        fetchProposals();
     }, []);
 
-    // 配置 Ant Design Table 的列
+    // 初始加载
+    useEffect(() => {
+        fetchData();
+    }, [fetchData]);
+
+    // 交易成功后的闭环逻辑
+    useEffect(() => {
+        if (isConfirming) {
+            message.success("链上执行成功！正在同步 ClickHouse...");
+            setActiveId(null);
+            // 延迟 1.5 秒确保 Listener 写入完成
+            const timer = setTimeout(() => {
+                fetchData();
+            }, 1500);
+            return () => clearTimeout(timer);
+        }
+    }, [isConfirming, fetchData]);
+
+    // 处理投票
+    const handleVote = (pid: string) => {
+        setActiveId(pid);
+        writeContract({
+            address: CONTRACT_ADDRESS,
+            abi: governanceABI,
+            functionName: 'vote',
+            args: [BigInt(pid)],
+        });
+    };
+
+    // 处理执行拨付
+    const handleExecute = (pid: string) => {
+        setActiveId(pid);
+        const cleanPid = pid.trim();
+        writeContract({
+            address: CONTRACT_ADDRESS,
+            abi: governanceABI,
+            functionName: 'executeProposal',
+            args: [BigInt(cleanPid)],
+        });
+    };
+
     const columns = [
-        {
-            title: '提案 ID',
-            dataIndex: 'id',
-            key: 'id',
-            render: (text: string) => <b>#{text}</b>,
-        },
-        {
-            title: '提案描述',
-            dataIndex: 'description',
-            key: 'description',
-        },
-        {
-            title: '申请资金',
-            dataIndex: 'amount',
-            key: 'amount',
-            render: (amount: string) => `${amount} Wei`, // 暂时直接展示 Wei
-        },
+        { title: 'ID', dataIndex: 'id', key: 'id', render: (id: string) => `#${id}` },
+        { title: '描述', dataIndex: 'description', key: 'description' },
+        { title: '金额', dataIndex: 'amount', key: 'amount', render: (a: string) => `${a} Wei` },
         {
             title: '当前票数',
             dataIndex: 'votesFor',
             key: 'votesFor',
-            render: (votes: string) => <Tag color="blue">{votes} 票</Tag>,
+            render: (v: string) => <Tag color="blue">{v ? v : 0} 票</Tag>
         },
         {
-            title: '状态',
-            key: 'executed',
-            render: (_: any, record: Proposal) => (
-                record.executed ? <Tag color="green">已执行</Tag> : <Tag color="orange">投票中</Tag>
-            ),
+            title: '操作',
+            key: 'action',
+            render: (_: any, record: Proposal) => {
+                const isCurrentPending = activeId === record.id && (isWalletPending || isTxLoading);
+
+                return (
+                    <Space>
+                        {record.executed ? (
+                            <Tag color="green">已执行完成</Tag>
+                        ) : (
+                            <>
+                                <Button
+                                    type="link"
+                                    onClick={() => handleVote(record.id)}
+                                    loading={isCurrentPending}
+                                    disabled={!!activeId && activeId !== record.id}
+                                >
+                                    投票
+                                </Button>
+                                {/* 满足 10 票门槛显示执行按钮 */}
+                                {parseInt(record.votesFor) >= 10 && (
+                                    <Button
+                                        danger
+                                        type="primary"
+                                        size="small"
+                                        onClick={() => handleExecute(record.id)}
+                                        loading={isCurrentPending}
+                                        disabled={!!activeId && activeId !== record.id}
+                                    >
+                                        执行拨付
+                                    </Button>
+                                )}
+                            </>
+                        )}
+                    </Space>
+                );
+            },
         },
     ];
 
     return (
-        <Card style={{ margin: '20px', borderRadius: '12px', boxShadow: '0 4px 12px rgba(0,0,0,0.05)' }}>
-            <Title level={3}>DAO 治理提案看板</Title>
-            <p style={{ color: 'gray', marginBottom: '20px' }}>在这里查看和参与社区的重要决策。</p>
-
-            {loading ? (
-                <div style={{ textAlign: 'center', padding: '50px' }}>
-                    <Spin size="large" />
-                </div>
-            ) : (
-                <Table
-                    dataSource={proposals}
-                    columns={columns}
-                    rowKey="id"
-                    pagination={false}
-                />
-            )}
+        <Card className="m-5 rounded-xl shadow-md border-0 bg-gray-50/50">
+            <div className="flex justify-between items-center mb-6">
+                <Title level={3} style={{ margin: 0 }}>DAO 治理提案看板</Title>
+                <Button onClick={fetchData} loading={loading}>刷新列表</Button>
+            </div>
+            <Table
+                loading={loading}
+                dataSource={proposals}
+                columns={columns}
+                rowKey={(record) => `${record.id}-${record.description}`}
+                pagination={{ pageSize: 5 }}
+                className="shadow-sm rounded-lg overflow-hidden"
+            />
         </Card>
     );
 };
