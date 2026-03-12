@@ -28,15 +28,14 @@ func NewListProposalsLogic(ctx context.Context, svcCtx *svc.ServiceContext) *Lis
 
 // ListProposals 获取治理列表
 func (l *ListProposalsLogic) ListProposals(req *types.ListProposalsReq) (resp *types.ListProposalsResp, err error) {
-	// 编写聚合查询 SQL
 	query := `
-		SELECT 
-			pid, proposer, description, amount, receiver,
-			(SELECT sum(toUInt64(weight)) FROM course_dao.vote_events WHERE pid = p.pid) as votes,
-			(SELECT count() FROM course_dao.proposal_executed_events WHERE pid = p.pid) as executed
-		FROM course_dao.proposal_created_events AS p
-		ORDER BY event_time DESC
-	`
+       SELECT 
+          pid, proposer, description, amount, receiver,
+          toString((SELECT ifNull(sum(toUInt64(weight)), 0) FROM course_dao.vote_events WHERE pid = p.pid)) as votes,
+          (SELECT count() FROM course_dao.proposal_executed_events WHERE pid = p.pid) as executed
+       FROM course_dao.proposal_created_events AS p
+       ORDER BY event_time DESC
+    `
 
 	rows, err := l.svcCtx.Conn.Query(l.ctx, query)
 	if err != nil {
@@ -49,18 +48,17 @@ func (l *ListProposalsLogic) ListProposals(req *types.ListProposalsReq) (resp *t
 	for rows.Next() {
 		var (
 			p        types.Proposal
-			votes    uint64
+			votesStr string
 			executed uint64
 		)
 
-		// 扫描字段
 		err := rows.Scan(
 			&p.Id,
 			&p.Proposer,
 			&p.Description,
 			&p.Amount,
 			&p.Receiver,
-			&votes,
+			&votesStr,
 			&executed,
 		)
 		if err != nil {
@@ -68,8 +66,7 @@ func (l *ListProposalsLogic) ListProposals(req *types.ListProposalsReq) (resp *t
 			continue
 		}
 
-		// 格式化数据
-		p.VotesFor = string(votes) // 或者格式化为字符串
+		p.VotesFor = votesStr
 		p.Executed = executed > 0
 
 		list = append(list, p)

@@ -3,8 +3,6 @@ package governance
 import (
 	"context"
 	"fmt"
-	"strconv"
-
 	"github.com/wwater/course-dao/app/course/internal/svc"
 	"github.com/wwater/course-dao/app/course/internal/types"
 
@@ -27,31 +25,29 @@ func NewGetProposalLogic(ctx context.Context, svcCtx *svc.ServiceContext) *GetPr
 
 // GetProposal 获取提案详情
 func (l *GetProposalLogic) GetProposal(req *types.ProposalDetailReq) (resp *types.Proposal, err error) {
-	// 获取提案详情
 	query := `
-		SELECT 
-			pid, proposer, description, amount, receiver,
-			(SELECT ifNull(sum(toUInt64(weight)), 0) FROM course_dao.vote_events WHERE pid = p.pid) as votes,
-			(SELECT count() FROM course_dao.proposal_executed_events WHERE pid = p.pid) as executed
-		FROM course_dao.proposal_created_events AS p
-		WHERE pid = ? 
-		LIMIT 1
-	`
+       SELECT 
+          pid, proposer, description, amount, receiver,
+          toString((SELECT ifNull(sum(toUInt64(weight)), 0) FROM course_dao.vote_events WHERE pid = p.pid)) as votes,
+          (SELECT count() FROM course_dao.proposal_executed_events WHERE pid = p.pid) as executed
+       FROM course_dao.proposal_created_events AS p
+       WHERE pid = ? 
+       LIMIT 1
+    `
 
 	var (
 		p        types.Proposal
-		votes    uint64
+		votesStr string
 		executed uint64
 	)
 
-	// 获取单行数据
 	err = l.svcCtx.Conn.QueryRow(l.ctx, query, req.Id).Scan(
 		&p.Id,
 		&p.Proposer,
 		&p.Description,
 		&p.Amount,
 		&p.Receiver,
-		&votes,
+		&votesStr,
 		&executed,
 	)
 
@@ -61,9 +57,7 @@ func (l *GetProposalLogic) GetProposal(req *types.ProposalDetailReq) (resp *type
 		return nil, fmt.Errorf("未找到 ID 为 %s 的提案", req.Id)
 	}
 
-	// 将 uint64 的票数转为字符串返回给前端
-	p.VotesFor = strconv.FormatUint(votes, 10)
-	// 判断 count 是否大于 0 确定执行状态
+	p.VotesFor = votesStr
 	p.Executed = executed > 0
 
 	l.Infof("成功获取提案详情, pid: %s", req.Id)
