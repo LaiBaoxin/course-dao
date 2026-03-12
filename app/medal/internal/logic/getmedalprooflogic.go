@@ -3,6 +3,7 @@ package logic
 import (
 	"context"
 	"errors"
+	"strings"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/wwater/course-dao/app/medal/internal/svc"
@@ -18,11 +19,10 @@ type GetMedalProofLogic struct {
 	logx.Logger
 }
 
-// 💡 这里的白名单数据必须与 set_root.go 脚本中的数据严格一致
-// 生产环境下建议从数据库或配置文件加载
+// 设置白名单
 var whiteList = []utils.LeafData{
-	{Account: common.HexToAddress("0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266"), TokenId: 1},
-	{Account: common.HexToAddress("0x70997970C51812dc3A010C7d01b50e0d17dc79C8"), TokenId: 2},
+	{Account: common.HexToAddress("0x86CA3206A0B51914b9459AADa3B70B6ee3f2d983"), TokenId: 1},
+	{Account: common.HexToAddress("0x0000000000000000000000000000000000000001"), TokenId: 2},
 }
 
 func NewGetMedalProofLogic(ctx context.Context, svcCtx *svc.ServiceContext) *GetMedalProofLogic {
@@ -36,8 +36,8 @@ func NewGetMedalProofLogic(ctx context.Context, svcCtx *svc.ServiceContext) *Get
 // GetMedalProof 根据地址获取勋章证明
 func (l *GetMedalProofLogic) GetMedalProof(in *medal.GetMedalProofReq) (*medal.GetMedalProofResp, error) {
 	// 将输入的字符串地址转换为以太坊地址类型
-	targetAddr := common.HexToAddress(in.Address)
-	l.Infof("开始为地址生成 Merkle Proof: %s", targetAddr.Hex())
+	targetAddrStr := strings.ToLower(strings.TrimSpace(in.Address))
+	l.Infof("RPC 收到 Proof 请求: %s", targetAddrStr)
 
 	var leaves [][]byte
 	var userTokenId uint64
@@ -45,14 +45,15 @@ func (l *GetMedalProofLogic) GetMedalProof(in *medal.GetMedalProofReq) (*medal.G
 
 	// 构建白名单所有叶子节点，并匹配当前用户
 	for _, d := range whiteList {
-		// 直接比对 Address 类型
-		if d.Account == targetAddr {
+		// 构建叶子
+		leaf := utils.HashLeaf(d.Account.Hex(), d.TokenId)
+		leaves = append(leaves, leaf)
+
+		// 匹配当前请求者
+		if strings.ToLower(d.Account.Hex()) == targetAddrStr {
 			userTokenId = d.TokenId
 			found = true
 		}
-		// 构建 Tree 时使用的哈希必须一致
-		leaf := utils.HashLeaf(d.Account.Hex(), d.TokenId)
-		leaves = append(leaves, leaf)
 	}
 
 	if !found {
@@ -60,16 +61,14 @@ func (l *GetMedalProofLogic) GetMedalProof(in *medal.GetMedalProofReq) (*medal.G
 	}
 
 	tree := utils.NewMerkleTree(leaves)
-	userLeaf := utils.HashLeaf(targetAddr.Hex(), userTokenId)
-
+	userLeaf := utils.HashLeaf(common.HexToAddress(targetAddrStr).Hex(), userTokenId)
 	proofBytes := tree.GetProof(userLeaf)
-	if proofBytes == nil {
-		return nil, errors.New("failed to generate proof")
-	}
 
-	var proofStrings []string
-	for _, p := range proofBytes {
-		proofStrings = append(proofStrings, common.BytesToHash(p).Hex())
+	proofStrings := make([]string, 0)
+	if proofBytes != nil {
+		for _, p := range proofBytes {
+			proofStrings = append(proofStrings, common.BytesToHash(p).Hex())
+		}
 	}
 
 	l.Infof("Proof 生成成功: ID=%d, Root=0x%x", userTokenId, tree.Root)
