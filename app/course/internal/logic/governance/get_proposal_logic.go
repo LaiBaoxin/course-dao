@@ -26,14 +26,14 @@ func NewGetProposalLogic(ctx context.Context, svcCtx *svc.ServiceContext) *GetPr
 // GetProposal 获取提案详情
 func (l *GetProposalLogic) GetProposal(req *types.ProposalDetailReq) (resp *types.Proposal, err error) {
 	query := `
-       SELECT 
-          pid, proposer, description, amount, receiver,
-          toString((SELECT ifNull(sum(toUInt64(weight)), 0) FROM course_dao.vote_events WHERE pid = p.pid)) as votes,
-          (SELECT count() FROM course_dao.proposal_executed_events WHERE pid = p.pid) as executed
-       FROM course_dao.proposal_created_events AS p
-       WHERE pid = ? 
-       LIMIT 1
-    `
+	   SELECT 
+		  pid, proposer, description, amount, receiver,
+		  toString((SELECT ifNull(sum(toUInt64(weight)), 0) FROM course_dao.vote_events WHERE toString(pid) = toString(p.pid))) as votes,
+		  (SELECT count() FROM course_dao.proposal_executed_events WHERE toString(pid) = toString(p.pid)) as executed
+	   FROM course_dao.proposal_created_events AS p
+	   WHERE toString(pid) = ? 
+	   LIMIT 1
+	`
 
 	var (
 		p        types.Proposal
