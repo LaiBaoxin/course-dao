@@ -21,10 +21,13 @@ import (
 var (
 	configFile = flag.String("f", "etc/listener.yaml", "the config file")
 
-	sigTransfer        = common.HexToHash("0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef")
-	sigProposalCreated = common.HexToHash("0x71869e97c9b2079093375865230985220c4228c2ea66e6b4e6d4e101f3b0e352")
-	sigVoted           = common.HexToHash("0x16f9a6566d214a1c5180f6f4c89283f6f1406e90647a544a49685a113f86e379")
-	sigExecuted        = common.HexToHash("0x4037996c9e0568c005a74e5033c46e053a473d09252327092120407f354f9a76")
+	// Transfer 事件固定哈希
+	sigTransfer = common.HexToHash("0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef")
+
+	// 动态哈希
+	sigProposalCreated common.Hash
+	sigVoted           common.Hash
+	sigExecuted        common.Hash
 )
 
 const vaultABIJson = `[{"anonymous":false,"inputs":[{"indexed":true,"name":"pid","type":"uint256"},{"name":"desc","type":"string"},{"name":"amount","type":"uint256"},{"name":"receiver","type":"address"}],"name":"ProposalCreated","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"name":"pid","type":"uint256"},{"name":"voter","type":"address"},{"name":"weight","type":"uint256"}],"name":"Voted","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"name":"pid","type":"uint256"},{"name":"receiver","type":"address"},{"name":"amount","type":"uint256"}],"name":"Executed","type":"event"}]`
@@ -48,6 +51,10 @@ func main() {
 		log.Fatalf("Eth 失败: %v", err)
 	}
 	vaultAbi, _ := abi.JSON(strings.NewReader(vaultABIJson))
+
+	sigProposalCreated = vaultAbi.Events["ProposalCreated"].ID
+	sigVoted = vaultAbi.Events["Voted"].ID
+	sigExecuted = vaultAbi.Events["Executed"].ID
 
 	medalAddr := common.HexToAddress(c.Eth.ContractAddress)
 	vaultAddr := common.HexToAddress(c.Eth.VaultAddress)
@@ -143,7 +150,7 @@ func processEvent(conn clickhouse.Conn, vLog types.Log, medalAddr, vaultAddr com
 		tokenId := new(big.Int).SetBytes(vLog.Topics[3].Bytes()).Uint64()
 		query := `INSERT INTO course_dao.medal_mint_events (token_id, to_address, transaction_hash, block_number, minted_at) VALUES (?, ?, ?, ?, now())`
 		_ = conn.Exec(ctx, query, tokenId, toAddr, txHash, vLog.BlockNumber)
-		log.Printf("✨ [勋章] #%d -> %s", tokenId, toAddr[:8])
+		log.Printf("- [勋章] #%d -> %s", tokenId, toAddr[:8])
 	}
 
 	if vLog.Address == vaultAddr {
@@ -158,9 +165,10 @@ func processEvent(conn clickhouse.Conn, vLog types.Log, medalAddr, vaultAddr com
 			if err := vaultAbi.UnpackIntoInterface(&event, "ProposalCreated", vLog.Data); err != nil {
 				return
 			}
+			// 这里因为参数去掉了 proposer，我们暂时把 proposer 留空存入数据库
 			query := `INSERT INTO course_dao.proposal_created_events (pid, proposer, description, amount, receiver, tx_hash, block_number) VALUES (?, ?, ?, ?, ?, ?, ?)`
 			_ = conn.Exec(ctx, query, pid, "", event.Desc, event.Amount.String(), event.Receiver.Hex(), txHash, vLog.BlockNumber)
-			log.Printf("[提案] ID:%s | 金额:%s", pid, event.Amount.String())
+			log.Printf("- [提案] ID:%s | 金额:%s", pid, event.Amount.String())
 		case sigVoted: // 投票
 			var event struct {
 				Voter  common.Address
@@ -169,7 +177,7 @@ func processEvent(conn clickhouse.Conn, vLog types.Log, medalAddr, vaultAddr com
 			_ = vaultAbi.UnpackIntoInterface(&event, "Voted", vLog.Data)
 			query := `INSERT INTO course_dao.vote_events (pid, voter, weight, tx_hash, block_number) VALUES (?, ?, ?, ?, ?)`
 			_ = conn.Exec(ctx, query, pid, event.Voter.Hex(), event.Weight.String(), txHash, vLog.BlockNumber)
-			log.Printf("[投票] ID:%s | 投票人:%s", pid, event.Voter.Hex()[:8])
+			log.Printf("- [投票] ID:%s | 投票人:%s", pid, event.Voter.Hex()[:8])
 		case sigExecuted: // 执行
 			var event struct {
 				Receiver common.Address
