@@ -4,5 +4,9 @@ Port: 8889
 ClickHouse:
   DataSource: "clickhouse://admin:123456@127.0.0.1:9000/course_dao"
 Auth:
-  AccessSecret: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE3NzMzODE4OTYsImlhdCI6MTc3MzI5NTQ5Niwid2FsbGV0IjoiMHg4NkNBMzIwNkEwQjUxOTE0Yjk0NTlBQURhM0I3MEI2ZWUzZjJkOTgzIn0.5p9DHTSouMWks5IRqUhDn7kurOp-M3zuDk8XyMRu-vY"
+  AccessSecret: "CourseDao-Super-Secret-Key-2026"
   AccessExpire: 86400
+MedalRpc:
+  Endpoints:
+    - 127.0.0.1:8080 # medal-rpc 启动的端口
+  NonBlock: true     # 防止 RPC 挂了导致整个服务起不来
