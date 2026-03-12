@@ -30,3 +30,7 @@ type Proposal struct {
 	Executed    bool   `json:"executed"`
 	Deadline    int64  `json:"deadline"`
 }
+
+type ProposalDetailReq struct {
+	Id string `path:"id"`
+}

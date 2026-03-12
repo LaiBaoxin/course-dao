@@ -26,9 +26,8 @@ func NewGetMedalsByAddressLogic(ctx context.Context, svcCtx *svc.ServiceContext)
 	}
 }
 
-// GetMedalsByAddress 根据地址获取勋章列表
+// GetMedalsByAddress 根据地址获取勋章列表（已加入去重逻辑）
 func (l *GetMedalsByAddressLogic) GetMedalsByAddress(in *medal.GetMedalsReq) (*medal.GetMedalsResp, error) {
-	// 归一化地址
 	searchAddr := strings.ToLower(in.Address)
 
 	var results []struct {
@@ -37,9 +36,16 @@ func (l *GetMedalsByAddressLogic) GetMedalsByAddress(in *medal.GetMedalsReq) (*m
 		BlockNumber uint64   `ch:"block_number"`
 	}
 
-	query := `SELECT token_id, transaction_hash, block_number 
-              FROM course_dao.medal_mint_events 
-              WHERE to_address = ?`
+	// 使用 argMax 确保每个 token_id 只返回 block_number 最大（最新）的那条数据
+	query := `
+		SELECT 
+			token_id, 
+			argMax(transaction_hash, block_number) as transaction_hash, 
+			max(block_number) as block_number
+		FROM course_dao.medal_mint_events 
+		WHERE to_address = ?
+		GROUP BY token_id
+	`
 
 	// 处理后的 searchAddr 进行查询
 	err := l.svcCtx.Conn.Select(l.ctx, &results, query, searchAddr)
@@ -62,6 +68,6 @@ func (l *GetMedalsByAddressLogic) GetMedalsByAddress(in *medal.GetMedalsReq) (*m
 		})
 	}
 
-	logx.Infof("Query success, address: %s, count: %d", searchAddr, len(medals))
+	logx.Infof("Query success, address: %s, unique count: %d", searchAddr, len(medals))
 	return &medal.GetMedalsResp{Medals: medals}, nil
 }

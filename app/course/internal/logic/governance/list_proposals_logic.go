@@ -32,7 +32,7 @@ func (l *ListProposalsLogic) ListProposals(req *types.ListProposalsReq) (resp *t
 	query := `
 		SELECT 
 			pid, proposer, description, amount, receiver,
-			(SELECT sum(toUint64(weight)) FROM course_dao.vote_events WHERE pid = p.pid) as votes,
+			(SELECT sum(toUInt64(weight)) FROM course_dao.vote_events WHERE pid = p.pid) as votes,
 			(SELECT count() FROM course_dao.proposal_executed_events WHERE pid = p.pid) as executed
 		FROM course_dao.proposal_created_events AS p
 		ORDER BY event_time DESC

@@ -23,6 +23,9 @@ type (
 	ListProposalsResp {
 		List []Proposal `json:"list"`
 	}
+	ProposalDetailReq {
+		Id string `path:"id"`
+	}
 )
 
 @server (
@@ -43,5 +46,8 @@ service course-api {
 service course-api {
 	@handler ListProposals
 	get /proposals (ListProposalsReq) returns (ListProposalsResp)
+
+	@handler GetProposal
+	get /proposals/:id (ProposalDetailReq) returns (Proposal)
 }
 

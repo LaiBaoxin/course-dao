@@ -36,6 +36,11 @@ func RegisterHandlers(server *rest.Server, serverCtx *svc.ServiceContext) {
 				Path:    "/proposals",
 				Handler: governance.ListProposalsHandler(serverCtx),
 			},
+			{
+				Method:  http.MethodGet,
+				Path:    "/proposals/:id",
+				Handler: governance.GetProposalHandler(serverCtx),
+			},
 		},
 		rest.WithPrefix("/v1/governance"),
 	)
