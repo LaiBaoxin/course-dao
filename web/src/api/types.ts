@@ -18,3 +18,14 @@ export interface MedalDetailRes {
 export interface MedalDetailResp {
     medal: MedalDetailRes;
 }
+
+// 定义提案的数据结构
+export interface Proposal {
+    id: string;
+    proposer: string;
+    description: string;
+    amount: string;
+    receiver: string;
+    votesFor: string;
+    executed: boolean;
+}

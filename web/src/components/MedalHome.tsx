@@ -10,10 +10,10 @@ import {
     PlayCircleOutlined,
     FireTwoTone
 } from '@ant-design/icons';
-import { AppHeader } from './AppHeader';
+// 🌟 1. 已删除：import { AppHeader } from './AppHeader';
 import { useMedal } from '../hooks/useMedal';
 import { useAuth } from '../hooks/useAuth';
-import {getPremiumCourse, type PremiumCourseResp} from '../api/course';
+import { getPremiumCourse, type PremiumCourseResp } from '../api/course';
 
 const { Content } = Layout;
 const { Title, Text, Paragraph } = Typography;
@@ -23,9 +23,9 @@ interface MedalHomeProps {
     setIsDarkMode: (v: boolean) => void;
 }
 
-export const MedalHome: React.FC<MedalHomeProps> = ({ isDarkMode, setIsDarkMode }) => {
+export const MedalHome: React.FC<MedalHomeProps> = ({ isDarkMode }) => {
     // 获取业务状态
-    const { loading, proof, ownedMedals, handleClaim } = useMedal();
+    const { loading, proof, ownedMedals } = useMedal();
     // 获取登录状态
     const { isAuthenticated } = useAuth();
 
@@ -69,13 +69,7 @@ export const MedalHome: React.FC<MedalHomeProps> = ({ isDarkMode, setIsDarkMode 
 
     return (
         <Layout className="min-h-screen bg-transparent">
-            <AppHeader
-                isDarkMode={isDarkMode}
-                setIsDarkMode={setIsDarkMode}
-                isProcessing={loading}
-                onClaim={handleClaim}
-                hasProof={hasProof}
-            />
+            {/* 🌟 2. 已删除：<AppHeader /> 标签，现在它由全局的 App.tsx 统一管理了 */}
 
             <Content className="p-8 relative flex flex-col items-center justify-center min-h-[calc(100vh-64px)]">
 
