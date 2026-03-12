@@ -4,6 +4,7 @@
 package handler
 
 import (
+	"github.com/wwater/course-dao/app/medal/api/internal/handler/medal"
 	"net/http"
 
 	auth "github.com/wwater/course-dao/app/medal/api/internal/handler/auth"
@@ -19,12 +20,12 @@ func RegisterHandlers(server *rest.Server, serverCtx *svc.ServiceContext) {
 			{
 				Method:  http.MethodGet,
 				Path:    "/v1/medals/:address",
-				Handler: GetMedalsHandler(serverCtx),
+				Handler: medal.GetMedalsHandler(serverCtx),
 			},
 			{
 				Method:  http.MethodGet,
 				Path:    "/v1/medals/detail/:tokenId",
-				Handler: GetMedalDetailHandler(serverCtx),
+				Handler: medal.GetMedalDetailHandler(serverCtx),
 			},
 		},
 	)

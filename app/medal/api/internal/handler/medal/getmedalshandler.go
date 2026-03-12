@@ -1,7 +1,7 @@
 // Code scaffolded by goctl. Safe to edit.
 // goctl 1.9.2
 
-package handler
+package medal
 
 import (
 	"github.com/wwater/course-dao/app/medal/api/internal/logic/medal"

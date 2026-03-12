@@ -1,6 +1,3 @@
-// Code scaffolded by goctl. Safe to edit.
-// goctl 1.9.2
-
 package medal
 
 import (
@@ -26,7 +23,7 @@ func NewGetMedalsLogic(ctx context.Context, svcCtx *svc.ServiceContext) *GetMeda
 	}
 }
 
-// GetMedals 获取用户所有勋章
+// GetMedals 获取用户所有的勋章以及可领取的证明
 func (l *GetMedalsLogic) GetMedals(req *types.GetMedalsReq) (resp *types.GetMedalsResp, err error) {
 	// 获取已拥有的勋章列表
 	ownedRpcResp, err := l.svcCtx.MedalRpc.GetMedalsByAddress(l.ctx, &medal.GetMedalsReq{
@@ -42,6 +39,8 @@ func (l *GetMedalsLogic) GetMedals(req *types.GetMedalsReq) (resp *types.GetMeda
 				BlockNumber: m.BlockNumber,
 			})
 		}
+	} else {
+		l.Errorf("获取已拥有勋章失败: %v", err)
 	}
 
 	// 获取领取证明 (Merkle Proof)
@@ -56,9 +55,10 @@ func (l *GetMedalsLogic) GetMedals(req *types.GetMedalsReq) (resp *types.GetMeda
 		// 只有在匹配到白名单时，RPC 才会返回非空的 proof
 		proof = proofRpcResp.Proof
 		claimableTokenId = proofRpcResp.TokenId
-		l.Infof("找到领取资格: ID=%d, Proof长度=%d", claimableTokenId, len(proof))
+		l.Infof("地址 %s 匹配白名单: TokenID=%d, Proof长度=%d", req.Address, claimableTokenId, len(proof))
 	} else {
-		l.Infof("该地址暂无领取资格或未在白名单中")
+		// RPC 错误或地址不在白名单
+		l.Infof("地址 %s 未在白名单或暂时无法获取证明", req.Address)
 	}
 
 	return &types.GetMedalsResp{

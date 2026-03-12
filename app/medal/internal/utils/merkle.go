@@ -26,11 +26,10 @@ type MerkleTree struct {
 func HashLeaf(address string, tokenId uint64) []byte {
 	addr := common.HexToAddress(address)
 
-	// uint256 在 EVM 中占 32 字节
+	// uint256 在 EVM 中占 32 字节，Go 的 uint64 需要补零对齐
 	tokenBuf := make([]byte, 32)
-	binary.BigEndian.PutUint64(tokenBuf[24:], tokenId) // 后 8 字节填充，前面补 0
+	binary.BigEndian.PutUint64(tokenBuf[24:], tokenId)
 
-	// 拼接: 20字节地址 + 32字节数字 = 52字节
 	var data []byte
 	data = append(data, addr.Bytes()...)
 	data = append(data, tokenBuf...)
@@ -61,12 +60,13 @@ func NewMerkleTree(leaves [][]byte) *MerkleTree {
 		for i := 0; i < len(prevLevel); i += 2 {
 			if i+1 < len(prevLevel) {
 				h1, h2 := prevLevel[i], prevLevel[i+1]
-				// ⚖️ 左右排序合并（OpenZeppelin 标准）
+				// 左右排序合并（OpenZeppelin 标准）
 				if bytes.Compare(h1, h2) > 0 {
 					h1, h2 = h2, h1
 				}
 				nextLevel = append(nextLevel, crypto.Keccak256(append(h1, h2...)))
 			} else {
+				// 奇数节点直接向上传递
 				nextLevel = append(nextLevel, prevLevel[i])
 			}
 		}
@@ -80,7 +80,7 @@ func NewMerkleTree(leaves [][]byte) *MerkleTree {
 	}
 }
 
-// GetProof 生成指定叶子的证明
+// GetProof 生成指定叶子的证明路径
 func (m *MerkleTree) GetProof(leaf []byte) [][]byte {
 	var proof [][]byte
 	idx := -1
