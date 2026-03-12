@@ -26,21 +26,28 @@ export const useMedal = () => {
 
     const fetchData = useCallback(async (rawAddress: string) => {
         if (!rawAddress) return;
-
-        // 强制转为小写，防止因为 MetaMask 大小写校验和导致后端查不到数据
         const address = rawAddress.toLowerCase();
 
         try {
             const response: any = await request.get(`/v1/medals/${address}`);
             const res = response.data ? response.data : response;
+
+            // 更新已拥有的勋章
             const medals = res.medals || [];
             setOwnedMedals(medals);
 
-            const isClaimed = medals.some((m: any) => Number(m.tokenId) === Number(res.claimableTokenId));
+            // 判断是否显示“领取”按钮
+            const claimableId = Number(res.claimableTokenId);
 
-            if (!isClaimed && res.proof && res.proof.length > 0) {
-                setProof(res.proof);
-                setClaimId(res.claimableTokenId);
+            // 检查这个 TokenId 是否已经领过
+            const isAlreadyOwned = medals.some((m: any) => Number(m.tokenId) === claimableId);
+
+            // 只要后端给出了有效的 claimableTokenId，且用户还没领过
+            // 即使 proof 是空数组 [] (单白名单) 或者是 [hash] (双白名单)，都允许设置状态
+            if (claimableId > 0 && !isAlreadyOwned && res.proof !== null) {
+                setProof(res.proof); // 可能是 []，也可能是 ["0x..."]
+                setClaimId(claimableId);
+                console.log(`发现可领取勋章: #${claimableId}, Proof长度: ${res.proof.length}`);
             } else {
                 setProof([]);
                 setClaimId(null);
@@ -63,7 +70,7 @@ export const useMedal = () => {
     }, [isConnected, wagmiAddress, fetchData, clearState]);
 
     const handleClaim = async () => {
-        if (proof.length === 0 || claimId === null || claimId === 0) {
+        if (claimId === null || claimId === 0) {
             msgApi.warning({ content: '申领凭证无效，请确保您在白名单中' });
             return;
         }
