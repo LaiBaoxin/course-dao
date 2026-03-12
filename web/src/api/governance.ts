@@ -3,6 +3,17 @@ import type { Proposal } from './types';
 
 export const governanceABI = [
     {
+        "inputs": [
+            { "name": "_desc", "type": "string" },
+            { "name": "_amount", "type": "uint256" },
+            { "name": "_receiver", "type": "address" }
+        ],
+        "name": "propose",
+        "outputs": [],
+        "stateMutability": "nonpayable",
+        "type": "function"
+    },
+    {
         "inputs": [{ "name": "_pid", "type": "uint256" }],
         "name": "vote",
         "outputs": [],
