@@ -30,7 +30,7 @@ contract CourseGovernorTest is Test {
         // 给投票者准备点钱并让他买个勋章（获得投票权）
         vm.startPrank(voter);
         vm.deal(voter, 1 ether);
-        medal.buyMedal{value: 0.01 ether}();
+        medal.buyMedal{value: 0.01 ether}(CourseMedal.Level.Bronze);
         vm.stopPrank();
 
         vm.roll(block.number + 1);

@@ -15,8 +15,8 @@ contract DeployDAO is Script {
         CourseGovernor governor = new CourseGovernor(medal);
         console.log("CourseGovernor deployed to:", address(governor));
 
-        // 给新 Governor 初始注入 0.05 ETH 种子基金，用于后续提案执行测试
-        payable(address(governor)).transfer(0.05 ether); 
+        // 给新 Governor 初始注入 0.3 ETH 种子基金，用于后续提案执行测试
+        payable(address(governor)).transfer(0.3 ether); 
 
         vm.stopBroadcast();
     }

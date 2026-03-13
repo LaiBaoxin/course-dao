@@ -10,14 +10,19 @@ import { EIP712 } from "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
 contract CourseMedal is ERC721, EIP712, ERC721Votes, Ownable {
     bytes32 public merkleRoot;
     mapping(address => bool) public hasClaimed;
+    // 记录用户拥有的 TokenID，用于查询权重
+    mapping(address => uint256) public userTokenId;
+    
     uint256 private _nextTokenId;
 
-    // 申购价格 (0.01 ETH)
-    uint256 public constant MINT_PRICE = 0.01 ether;
+    // 定义勋章等级
+    enum Level { Bronze, Silver, Gold }
+
+    // 记录每个 TokenID 对应的等级
+    mapping(uint256 => Level) public tokenLevels;
 
     event CourseMedalClaimed(address indexed account, uint256 tokenId);
-    // 购买事件
-    event CourseMedalBought(address indexed account, uint256 tokenId);
+    event CourseMedalBought(address indexed account, uint256 tokenId, Level level);
 
     constructor() 
         ERC721("Course DAO Medal", "CDM") 
@@ -25,37 +30,89 @@ contract CourseMedal is ERC721, EIP712, ERC721Votes, Ownable {
         Ownable(msg.sender) 
     {}
 
+    // Bronze=1, Silver=2, Gold=5
+    function getLevelWeight(Level level) public pure returns (uint256) {
+        if (level == Level.Silver) return 2;
+        if (level == Level.Gold) return 5;
+        return 1;
+    }
+
+    // 告诉 Governor 这个人现在有多少票
+    function _getVotingUnits(address account) internal view virtual override returns (uint256) {
+        if (balanceOf(account) == 0) return 0;
+        uint256 tokenId = userTokenId[account];
+        return getLevelWeight(tokenLevels[tokenId]);
+    }
+
+    // 设置默克尔根
+    function setMerkleRoot(bytes32 _merkleRoot) external onlyOwner {
+        merkleRoot = _merkleRoot;
+    }
+
+    // safeMint 方法（供管理员/测试脚本使用）
+    // 默认赋予 Level.Bronze 等级
+    function safeMint(address to) public onlyOwner {
+        require(!hasClaimed[to], "CourseMedal: User already has a medal");
+        
+        uint256 tokenId = _nextTokenId++;
+        hasClaimed[to] = true;
+        userTokenId[to] = tokenId;
+        tokenLevels[tokenId] = Level.Bronze; // 管理员手动铸造默认给青铜
+
+        _safeMint(to, tokenId);
+        _delegate(to, to); // 自动开启投票权
+    }
+
     // 公开申购函数
-    // 给钱就卖，不查白名单，每人限购一个（通过 hasClaimed 复用逻辑）
-    function buyMedal() external payable {
-        require(msg.value >= MINT_PRICE, "CourseMedal: Insufficient ETH sent");
-        require(!hasClaimed[msg.sender], "CourseMedal: Already has a medal");
+    function buyMedal(Level level) external payable {
+        uint256 requiredPrice = 0.01 ether;
+        if (level == Level.Silver) requiredPrice = 0.02 ether;
+        else if (level == Level.Gold) requiredPrice = 0.05 ether;
+
+        require(msg.value >= requiredPrice, "Insufficient payment");
+        require(!hasClaimed[msg.sender], "Already has a medal");
 
         uint256 tokenId = _nextTokenId++;
         
         hasClaimed[msg.sender] = true;
+        userTokenId[msg.sender] = tokenId;
+        tokenLevels[tokenId] = level;
+
         _safeMint(msg.sender, tokenId);
-        
-        // 自动为自己委托投票权，用户买完秒变“选民”
         _delegate(msg.sender, msg.sender);
 
-        emit CourseMedalBought(msg.sender, tokenId);
+        emit CourseMedalBought(msg.sender, tokenId, level);
 
-        // 多余的钱退还
-        if (msg.value > MINT_PRICE) {
-            payable(msg.sender).transfer(msg.value - MINT_PRICE);
+        if (msg.value > requiredPrice) {
+            payable(msg.sender).transfer(msg.value - requiredPrice);
         }
     }
 
-    // 所有者提现
-    function withdraw() external onlyOwner {
-        uint256 balance = address(this).balance;
-        require(balance > 0, "No balance to withdraw");
-        payable(owner()).transfer(balance);
+    // 白名单领取
+    function claim(bytes32[] calldata proof, uint256 tokenId) external {
+        require(!hasClaimed[msg.sender], "Already claimed");
+
+        bytes32 leaf;
+        assembly {
+            let ptr := mload(0x40)
+            mstore(ptr, caller())         
+            mstore(add(ptr, 32), tokenId) 
+            leaf := keccak256(add(ptr, 12), 52)
+        }
+        
+        require(MerkleProof.verify(proof, merkleRoot, leaf), "Invalid merkle proof");
+
+        hasClaimed[msg.sender] = true;
+        userTokenId[msg.sender] = tokenId;
+        tokenLevels[tokenId] = Level.Bronze;
+
+        _safeMint(msg.sender, tokenId);
+        _delegate(msg.sender, msg.sender);
+
+        emit CourseMedalClaimed(msg.sender, tokenId);
     }
 
-    // --- 以下保持你原有的逻辑不变 ---
-
+    // 重写函数进行覆盖
     function _update(address to, uint256 tokenId, address auth)
         internal
         override(ERC721, ERC721Votes)
@@ -71,37 +128,7 @@ contract CourseMedal is ERC721, EIP712, ERC721Votes, Ownable {
         super._increaseBalance(account, value);
     }
 
-    function safeMint(address to) public onlyOwner {
-        uint256 tokenId = _nextTokenId++;
-        _safeMint(to, tokenId);
-    }
-
-    function setMerkleRoot(bytes32 _merkleRoot) external onlyOwner {
-        merkleRoot = _merkleRoot;
-    }
-
-    function claim(bytes32[] calldata proof, uint256 tokenId) external {
-        require(!hasClaimed[msg.sender], "CourseMedal: Already claimed");
-
-        bytes32 leaf;
-        assembly {
-            let ptr := mload(0x40)
-            mstore(ptr, caller())         
-            mstore(add(ptr, 32), tokenId) 
-            leaf := keccak256(add(ptr, 12), 52)
-        }
-        
-        require(
-            MerkleProof.verify(proof, merkleRoot, leaf),
-            "CourseMedal: Invalid merkle proof"
-        );
-
-        hasClaimed[msg.sender] = true;
-        _safeMint(msg.sender, tokenId);
-        
-        // 白名单用户领取后直接有票
-        _delegate(msg.sender, msg.sender);
-
-        emit CourseMedalClaimed(msg.sender, tokenId);
+    function withdraw() external onlyOwner {
+        payable(owner()).transfer(address(this).balance);
     }
 }
