@@ -7,18 +7,17 @@ import {CourseGovernor} from "../src/CourseGovernor.sol";
 
 contract DeployDAO is Script {
     function run() external {
-        // 开始广播交易 (上链)
         vm.startBroadcast();
 
-        // 先部署 NFT 勋章合约
         CourseMedal medal = new CourseMedal();
         console.log("CourseMedal deployed to:", address(medal));
 
-        // 把勋章合约的地址传给 Governor 进行部署
         CourseGovernor governor = new CourseGovernor(medal);
         console.log("CourseGovernor deployed to:", address(governor));
 
-        // 结束广播
+        // 给新 Governor 初始注入 0.05 ETH 种子基金，用于后续提案执行测试
+        payable(address(governor)).transfer(0.05 ether); 
+
         vm.stopBroadcast();
     }
 }
