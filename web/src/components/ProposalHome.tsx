@@ -1,14 +1,15 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { Card, Table, Tag, Typography, message, Button, Space, Modal, Form, Input, InputNumber } from 'antd';
-import { PlusOutlined, ReloadOutlined } from '@ant-design/icons';
+import { Card, Table, Tag, Typography, message, Button, Space, Modal, Form, Input, InputNumber, Tooltip } from 'antd';
+import { PlusOutlined, ReloadOutlined, InfoCircleOutlined } from '@ant-design/icons';
 import { getProposals } from '../api/governance';
 import type { Proposal } from '../api/types';
 import { useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
 import { governanceABI } from '../api/governance.ts';
+import { formatEther, parseEther } from 'viem'; // 单位转换工具
 
-const { Title } = Typography;
+const { Title, Text } = Typography;
 
-// Remix 中最新的合约地址
+// Sepolia 或本地合约地址（第四阶段部署后需更新此处）
 const CONTRACT_ADDRESS = '0x3761b1F7f037318C018Ba5C5D473Ea92799B4Db5' as `0x${string}`;
 
 const ProposalHome: React.FC = () => {
@@ -39,25 +40,25 @@ const ProposalHome: React.FC = () => {
         }
     }, []);
 
-    // 初始化加载
+    // 初始加载
     useEffect(() => {
         fetchData();
     }, [fetchData]);
 
-    // 监听链上确认，成功后刷新列表并重置状态
+    // 监听链上确认结果
     useEffect(() => {
         if (isConfirming) {
-            message.success("区块链确认成功！正在同步链下数据库...");
+            message.success("区块链确认成功！数据已同步至分布式存储。");
             setIsModalVisible(false);
             form.resetFields();
             setActiveId(null);
-            // 给 Listener 留出 2 秒的扫描入库时间
+            // 延迟刷新，给后端 Listener 留出扫描区块的时间
             const timer = setTimeout(() => fetchData(), 2000);
             return () => clearTimeout(timer);
         }
     }, [isConfirming, fetchData, form]);
 
-    // 操作处理
+    // 投票处理
     const handleVote = (pid: string) => {
         setActiveId(pid);
         writeContract({
@@ -68,6 +69,7 @@ const ProposalHome: React.FC = () => {
         });
     };
 
+    // 执行拨付处理
     const handleExecute = (pid: string) => {
         setActiveId(pid);
         writeContract({
@@ -78,13 +80,14 @@ const ProposalHome: React.FC = () => {
         });
     };
 
+    // 支持 ETH 单位转换
     const handleProposeSubmit = async () => {
         try {
-            // 验证表单字段
             const values = await form.validateFields();
-            console.log("发起提案数据：", values);
-            // 3. 调用合约
-            const amount = values.amount ? BigInt(values.amount) : 0n;
+
+            // 将输入的 ETH 转换为 Wei (uint256)
+            // 用户输入 1，parseEther 转换为 10^18
+            const amountInWei = parseEther(values.amount.toString());
 
             writeContract({
                 address: CONTRACT_ADDRESS,
@@ -92,43 +95,61 @@ const ProposalHome: React.FC = () => {
                 functionName: 'propose',
                 args: [
                     values.description,
-                    amount,
-                    values.receiver
+                    amountInWei,
+                    values.receiver as `0x${string}`
                 ],
             }, {
-                onSuccess: (txHash) => {
-                    console.log("交易已提交，哈希：", txHash);
-                },
                 onError: (err) => {
                     console.error("合约写入失败：", err);
-                    message.error(`发起失败: ${err.message.split('\n')[0]}`);
+                    message.error(`交易被拒绝: ${err.message.split('\n')[0]}`);
                 }
             });
         } catch (error) {
-            // 表单验证未通过的情况
-            message.warning("请完善表单信息");
+            message.warning("请检查表单输入是否完整");
         }
     };
 
     const columns = [
-        { title: 'ID', dataIndex: 'id', key: 'id', render: (id: string) => <b style={{color: '#1890ff'}}>#{id}</b> },
-        { title: '提案描述', dataIndex: 'description', key: 'description' },
-        { title: '金额', dataIndex: 'amount', key: 'amount', render: (a: string) => `${a} Wei` },
         {
-            title: '当前票数',
-            dataIndex: 'votesFor',
-            key: 'votesFor',
-            render: (v: string) => <Tag color="processing">{v || 0} 票</Tag>
+            title: 'ID',
+            dataIndex: 'id',
+            key: 'id',
+            render: (id: string) => <b style={{color: '#1890ff'}}>#{id}</b>
         },
         {
-            title: '操作',
+            title: '提案描述',
+            dataIndex: 'description',
+            key: 'description',
+            ellipsis: true
+        },
+        {
+            title: '申请金额',
+            dataIndex: 'amount',
+            key: 'amount',
+            render: (a: string) => (
+                <Space>
+                    <Text strong>{formatEther(BigInt(a))} ETH</Text>
+                    <Tooltip title={`${a} Wei`}>
+                        <InfoCircleOutlined style={{ color: '#bfbfbf', fontSize: '12px' }} />
+                    </Tooltip>
+                </Space>
+            )
+        },
+        {
+            title: '当前权重',
+            dataIndex: 'votesFor',
+            key: 'votesFor',
+            render: (v: string) => <Tag color="blue" style={{ borderRadius: '4px' }}>{v || 0} 票</Tag>
+        },
+        {
+            title: '治理状态',
             key: 'action',
             render: (_: any, record: Proposal) => {
                 const isOpLoading = activeId === record.id && (isWalletPending || isTxLoading);
                 return (
                     <Space>
                         {record.executed ? (
-                            <Tag color="success">已执行完成</Tag>
+                            <Tag color="success" style={{ padding: '2px 10px' }}>已执行完成</Tag>
                         ) : (
                             <>
                                 <Button
@@ -159,18 +180,28 @@ const ProposalHome: React.FC = () => {
     ];
 
     return (
-        <Card className="m-5 shadow-lg border-0" style={{ borderRadius: '12px' }}>
-            <div className="flex justify-between items-center mb-6">
-                <Title level={3} style={{ margin: 0 }}>DAO 治理中心</Title>
-                <Space>
+        <Card className="m-5 shadow-lg border-0" style={{ borderRadius: '16px', background: '#f8f9fa' }}>
+            <div className="flex justify-between items-center mb-8">
+                <div>
+                    <Title level={2} style={{ margin: 0, color: '#1a1a1a' }}>DAO 治理看板</Title>
+                    <Text type="secondary">链上实时提案监控与资产拨付系统</Text>
+                </div>
+                <Space size="middle">
                     <Button
                         type="primary"
+                        size="large"
                         icon={<PlusOutlined />}
                         onClick={() => setIsModalVisible(true)}
+                        style={{ borderRadius: '8px', fontWeight: 'bold' }}
                     >
-                        发起新提案
+                        发起提案
                     </Button>
-                    <Button icon={<ReloadOutlined />} onClick={fetchData} loading={loading}>
+                    <Button
+                        icon={<ReloadOutlined />}
+                        onClick={fetchData}
+                        loading={loading}
+                        style={{ borderRadius: '8px' }}
+                    >
                         刷新
                     </Button>
                 </Space>
@@ -182,43 +213,53 @@ const ProposalHome: React.FC = () => {
                 loading={loading}
                 rowKey={(record) => `${record.id}-${record.description}`}
                 pagination={{ pageSize: 6 }}
+                style={{ background: '#fff', borderRadius: '8px' }}
             />
 
             {/* 发起提案弹窗 */}
             <Modal
-                title="创建新提案"
+                title={<b>创建新治理提案</b>}
                 open={isModalVisible}
                 onOk={handleProposeSubmit}
                 onCancel={() => setIsModalVisible(false)}
                 confirmLoading={isWalletPending || isTxLoading}
-                okText="发送到区块链"
+                okText="发送交易 (Sepolia)"
                 cancelText="取消"
                 destroyOnClose
+                width={520}
             >
                 <Form form={form} layout="vertical" className="mt-4">
                     <Form.Item
                         name="description"
                         label="提案内容"
-                        rules={[{ required: true, message: '请描述您的提案' }]}
+                        rules={[{ required: true, message: '请描述您的提案用途' }]}
                     >
-                        <Input.TextArea placeholder="例如：给社区开发者发放奖励" rows={3} />
+                        <Input.TextArea placeholder="例如：支付 2026 Q1 社区运营费用" rows={3} />
                     </Form.Item>
+
                     <Form.Item
                         name="amount"
-                        label="申请金额 (Wei)"
+                        label="申请金额 (ETH)"
+                        extra={<Text type="secondary" style={{ fontSize: '12px' }}>* 系统会自动转换为 Wei 提交至以太坊网络</Text>}
                         rules={[{ required: true, message: '请输入金额' }]}
                     >
-                        <InputNumber style={{ width: '100%' }} min={1} placeholder="100" />
+                        <InputNumber
+                            style={{ width: '100%' }}
+                            min={0.000001}
+                            placeholder="0.1"
+                            precision={6}
+                        />
                     </Form.Item>
+
                     <Form.Item
                         name="receiver"
-                        label="接收者地址"
+                        label="收款钱包地址"
                         rules={[
-                            { required: true, message: '请输入钱包地址' },
-                            { pattern: /^0x[a-fA-F0-9]{40}$/, message: '无效的以太坊地址' }
+                            { required: true, message: '请输入收款人地址' },
+                            { pattern: /^0x[a-fA-F0-9]{40}$/, message: '无效的以太坊地址格式' }
                         ]}
                     >
-                        <Input placeholder="0x..." />
+                        <Input placeholder="0x..." spellCheck={false} />
                     </Form.Item>
                 </Form>
             </Modal>
