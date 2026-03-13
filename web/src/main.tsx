@@ -17,8 +17,7 @@ const config = createConfig({
     // sepolia 测试链
     chains: [sepolia],
     transports: {
-        // 2. 将传输协议指向 Sepolia
-        // 这里推荐直接使用 Alchemy 的 HTTPS 链接，速度最稳
+        // 直接使用 Alchemy 的 HTTPS 链接
         [sepolia.id]: http('https://eth-sepolia.g.alchemy.com/v2/h81_NhzDAZa0CosfZKdur'),
     },
 })

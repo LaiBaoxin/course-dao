@@ -1,6 +1,23 @@
 import request from '../utils/request';
 import type { GetMedalsResp, MedalDetailRes } from './types';
 
+export const medalABI = [
+    {
+        "inputs": [],
+        "name": "buyMedal",
+        "outputs": [],
+        "stateMutability": "payable",
+        "type": "function"
+    },
+    {
+        "inputs": [{"name": "delegatee", "type": "address"}],
+        "name": "delegate",
+        "outputs": [],
+        "stateMutability": "nonpayable",
+        "type": "function"
+    }
+] as const;
+
 /**
  * 获取指定地址的勋章列表
  * @param address 钱包地址

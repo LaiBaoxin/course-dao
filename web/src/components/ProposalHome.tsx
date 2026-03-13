@@ -1,29 +1,34 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { Card, Table, Tag, Typography, message, Button, Space, Modal, Form, Input, InputNumber, Tooltip } from 'antd';
-import { PlusOutlined, ReloadOutlined, InfoCircleOutlined } from '@ant-design/icons';
+import { Card, Table, Tag, Typography, message, Button, Space, Modal, Form, Input, InputNumber, Tooltip, Descriptions } from 'antd';
+import { PlusOutlined, ReloadOutlined, ShoppingCartOutlined } from '@ant-design/icons';
 import { getProposals } from '../api/governance';
 import type { Proposal } from '../api/types';
-import { useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
+import { useWriteContract, useWaitForTransactionReceipt, useBalance, useAccount } from 'wagmi';
 import { governanceABI } from '../api/governance.ts';
-import { formatEther, parseEther } from 'viem'; // 单位转换工具
+import { formatEther, parseEther, keccak256, toBytes } from 'viem';
+import { medalABI } from "../api/medal.ts";
 
 const { Title, Text } = Typography;
 
-// Sepolia 或本地合约地址（第四阶段部署后需更新此处）
-const CONTRACT_ADDRESS = '0x3761b1F7f037318C018Ba5C5D473Ea92799B4Db5' as `0x${string}`;
+// 新合约地址
+const MEDAL_ADDRESS = '0x33a741ffe6dcE2Ac9461abbE8476f55B26992434' as `0x${string}`;
+const GOVERNOR_ADDRESS = '0x55e802B25AFebD3A945474e1076D229286462577' as `0x${string}`;
 
 const ProposalHome: React.FC = () => {
     const [proposals, setProposals] = useState<Proposal[]>([]);
     const [loading, setLoading] = useState<boolean>(true);
     const [isModalVisible, setIsModalVisible] = useState(false);
+    const [isDetailVisible, setIsDetailVisible] = useState(false);
     const [activeId, setActiveId] = useState<string | null>(null);
+    const [currentProposal, setCurrentProposal] = useState<Proposal | null>(null);
     const [form] = Form.useForm();
 
-    // Wagmi
+    const { address: userAddress } = useAccount();
     const { writeContract, data: hash, isPending: isWalletPending } = useWriteContract();
-
-    // 监听所有写入交易的回执
     const { isSuccess: isConfirming, isLoading: isTxLoading } = useWaitForTransactionReceipt({ hash });
+
+    // 获取国库实时余额
+    const { data: treasuryBalance, refetch: refetchBalance } = useBalance({ address: GOVERNOR_ADDRESS });
 
     const fetchData = useCallback(async () => {
         try {
@@ -33,76 +38,109 @@ const ProposalHome: React.FC = () => {
             if (actualData && actualData.list) {
                 setProposals(actualData.list);
             }
+            refetchBalance(); // 顺便刷新一下国库余额
         } catch (e) {
             message.error("从数据库同步数据失败");
         } finally {
             setLoading(false);
         }
-    }, []);
+    }, [refetchBalance]);
 
-    // 初始加载
     useEffect(() => {
         fetchData();
     }, [fetchData]);
 
-    // 监听链上确认结果
     useEffect(() => {
         if (isConfirming) {
-            message.success("区块链确认成功！数据已同步至分布式存储。");
+            message.success("区块链交易确认成功！");
             setIsModalVisible(false);
             form.resetFields();
             setActiveId(null);
-            // 延迟刷新，给后端 Listener 留出扫描区块的时间
             const timer = setTimeout(() => fetchData(), 2000);
             return () => clearTimeout(timer);
         }
     }, [isConfirming, fetchData, form]);
 
-    // 投票处理
+    const formatId = (id: string) => {
+        if (!id || id.length <= 10) return id;
+        return `${id.slice(0, 6)}...${id.slice(-4)}`;
+    };
+
+    // 购买勋章
+    const handleBuyMedal = () => {
+        writeContract({
+            address: MEDAL_ADDRESS,
+            abi: medalABI,
+            functionName: 'buyMedal',
+            value: parseEther('0.01'),
+        }, {
+            onSuccess: () => message.info("正在等待 MetaMask 签名购买..."),
+            onError: (err) => {
+                const errorStr = err.message.toLowerCase();
+                if (errorStr.includes('reverted') || errorStr.includes('gas limit too high') || errorStr.includes('already')) {
+                    message.warning("购买拦截：您当前账号已经拥有勋章，无法重复购买！");
+                } else {
+                    message.error("购买失败，请确保钱包有足够的 Sepolia ETH！");
+                }
+            }
+        });
+    };
+
+    // 激活投票权 (Delegate)
+    const handleDelegate = () => {
+        if (!userAddress) return message.warning("请先连接钱包");
+        writeContract({
+            address: MEDAL_ADDRESS,
+            abi: medalABI,
+            functionName: 'delegate',
+            args: [userAddress],
+        }, {
+            onSuccess: () => message.success("正在激活您的投票权，请在钱包中确认..."),
+            onError: (err) => message.error(`激活失败: ${err.message.split('\n')[0]}`)
+        });
+    };
+
     const handleVote = (pid: string) => {
         setActiveId(pid);
         writeContract({
-            address: CONTRACT_ADDRESS,
+            address: GOVERNOR_ADDRESS,
             abi: governanceABI,
-            functionName: 'vote',
-            args: [BigInt(pid)],
+            functionName: 'castVote',
+            args: [BigInt(pid), 1],
         });
     };
 
-    // 执行拨付处理
-    const handleExecute = (pid: string) => {
-        setActiveId(pid);
+    const handleExecute = (record: Proposal) => {
+        setActiveId(record.id);
+        const descriptionHash = keccak256(toBytes(record.description));
         writeContract({
-            address: CONTRACT_ADDRESS,
+            address: GOVERNOR_ADDRESS,
             abi: governanceABI,
-            functionName: 'executeProposal',
-            args: [BigInt(pid)],
+            functionName: 'execute',
+            args: [
+                [record.receiver as `0x${string}`],
+                [BigInt(record.amount)],
+                ["0x"],
+                descriptionHash
+            ],
+        }, {
+            onSuccess: () => message.info("正在等待签名执行拨付..."),
+            onError: (err) => message.error(`执行失败: ${err.message.split('\n')[0]}`)
         });
     };
 
-    // 支持 ETH 单位转换
     const handleProposeSubmit = async () => {
         try {
             const values = await form.validateFields();
-
-            // 将输入的 ETH 转换为 Wei (uint256)
-            // 用户输入 1，parseEther 转换为 10^18
             const amountInWei = parseEther(values.amount.toString());
-
             writeContract({
-                address: CONTRACT_ADDRESS,
+                address: GOVERNOR_ADDRESS,
                 abi: governanceABI,
                 functionName: 'propose',
-                args: [
-                    values.description,
-                    amountInWei,
-                    values.receiver as `0x${string}`
-                ],
+                args: [[values.receiver as `0x${string}`], [amountInWei], ["0x"], values.description],
             }, {
-                onError: (err) => {
-                    console.error("合约写入失败：", err);
-                    message.error(`交易被拒绝: ${err.message.split('\n')[0]}`);
-                }
+                onSuccess: () => message.info("正在等待 MetaMask 签名发起提案..."),
+                onError: (err) => message.error(`提案失败: ${err.message.split('\n')[0]}`)
             });
         } catch (error) {
             message.warning("请检查表单输入是否完整");
@@ -110,37 +148,10 @@ const ProposalHome: React.FC = () => {
     };
 
     const columns = [
-        {
-            title: 'ID',
-            dataIndex: 'id',
-            key: 'id',
-            render: (id: string) => <b style={{color: '#1890ff'}}>#{id}</b>
-        },
-        {
-            title: '提案描述',
-            dataIndex: 'description',
-            key: 'description',
-            ellipsis: true
-        },
-        {
-            title: '申请金额',
-            dataIndex: 'amount',
-            key: 'amount',
-            render: (a: string) => (
-                <Space>
-                    <Text strong>{formatEther(BigInt(a))} ETH</Text>
-                    <Tooltip title={`${a} Wei`}>
-                        <InfoCircleOutlined style={{ color: '#bfbfbf', fontSize: '12px' }} />
-                    </Tooltip>
-                </Space>
-            )
-        },
-        {
-            title: '当前权重',
-            dataIndex: 'votesFor',
-            key: 'votesFor',
-            render: (v: string) => <Tag color="blue" style={{ borderRadius: '4px' }}>{v || 0} 票</Tag>
-        },
+        { title: 'ID', dataIndex: 'id', key: 'id', render: (id: string) => <Tooltip title={id} placement="topLeft"><b style={{color: '#1890ff', cursor: 'pointer'}}>#{formatId(id)}</b></Tooltip> },
+        { title: '提案描述', dataIndex: 'description', key: 'description', ellipsis: true },
+        { title: '申请金额', dataIndex: 'amount', key: 'amount', render: (a: string) => <Space><Text strong>{formatEther(BigInt(a))} ETH</Text></Space> },
+        { title: '当前权重', dataIndex: 'votesFor', key: 'votesFor', render: (v: string) => <Tag color="blue" style={{ borderRadius: '4px' }}>{v || 0} 票</Tag> },
         {
             title: '治理状态',
             key: 'action',
@@ -148,28 +159,14 @@ const ProposalHome: React.FC = () => {
                 const isOpLoading = activeId === record.id && (isWalletPending || isTxLoading);
                 return (
                     <Space>
+                        <Button type="link" size="small" onClick={() => { setCurrentProposal(record); setIsDetailVisible(true); }}>查看详情</Button>
                         {record.executed ? (
-                            <Tag color="success" style={{ padding: '2px 10px' }}>已执行完成</Tag>
+                            <Tag color="success">已拨付完成</Tag>
                         ) : (
                             <>
-                                <Button
-                                    type="link"
-                                    size="small"
-                                    onClick={() => handleVote(record.id)}
-                                    loading={isOpLoading}
-                                >
-                                    投票
-                                </Button>
-                                {parseInt(record.votesFor) >= 10 && (
-                                    <Button
-                                        danger
-                                        type="primary"
-                                        size="small"
-                                        onClick={() => handleExecute(record.id)}
-                                        loading={isOpLoading}
-                                    >
-                                        执行拨付
-                                    </Button>
+                                <Button type="default" size="small" onClick={() => handleVote(record.id)} loading={isOpLoading}>投票</Button>
+                                {parseInt(record.votesFor) >= 1 && (
+                                    <Button danger type="primary" size="small" onClick={() => handleExecute(record)} loading={isOpLoading}>执行拨付</Button>
                                 )}
                             </>
                         )}
@@ -185,83 +182,50 @@ const ProposalHome: React.FC = () => {
                 <div>
                     <Title level={2} style={{ margin: 0, color: '#1a1a1a' }}>DAO 治理看板</Title>
                     <Text type="secondary">链上实时提案监控与资产拨付系统</Text>
+                    <div style={{ marginTop: '8px' }}>
+                        <Tag color="gold" style={{ fontSize: '14px', padding: '4px 8px' }}>
+                            国库总资产: {treasuryBalance ? Number(formatEther(treasuryBalance.value)).toFixed(4) : '0.0000'} ETH
+                        </Tag>
+                    </div>
                 </div>
                 <Space size="middle">
-                    <Button
-                        type="primary"
-                        size="large"
-                        icon={<PlusOutlined />}
-                        onClick={() => setIsModalVisible(true)}
-                        style={{ borderRadius: '8px', fontWeight: 'bold' }}
-                    >
+                    <Button type="dashed" size="large" icon={<ShoppingCartOutlined />} onClick={handleBuyMedal} style={{ borderRadius: '8px', borderColor: '#faad14', color: '#faad14' }} loading={isWalletPending || isTxLoading}>
+                        申购勋章 (0.01 ETH)
+                    </Button>
+
+                    {/* 激活投票权按钮 */}
+                    <Button type="default" size="large" onClick={handleDelegate} style={{ borderRadius: '8px', color: '#52c41a', borderColor: '#52c41a' }} loading={isWalletPending || isTxLoading}>
+                        激活我的投票权
+                    </Button>
+
+                    <Button type="primary" size="large" icon={<PlusOutlined />} onClick={() => setIsModalVisible(true)} style={{ borderRadius: '8px', fontWeight: 'bold' }}>
                         发起提案
                     </Button>
-                    <Button
-                        icon={<ReloadOutlined />}
-                        onClick={fetchData}
-                        loading={loading}
-                        style={{ borderRadius: '8px' }}
-                    >
-                        刷新
-                    </Button>
+                    <Button icon={<ReloadOutlined />} onClick={fetchData} loading={loading} style={{ borderRadius: '8px' }}>刷新</Button>
                 </Space>
             </div>
 
-            <Table
-                dataSource={proposals}
-                columns={columns}
-                loading={loading}
-                rowKey={(record) => `${record.id}-${record.description}`}
-                pagination={{ pageSize: 6 }}
-                style={{ background: '#fff', borderRadius: '8px' }}
-            />
+            <Table dataSource={proposals} columns={columns} loading={loading} rowKey={(record) => `${record.id}-${record.description}`} pagination={{ pageSize: 6 }} style={{ background: '#fff', borderRadius: '8px' }} />
 
-            {/* 发起提案弹窗 */}
-            <Modal
-                title={<b>创建新治理提案</b>}
-                open={isModalVisible}
-                onOk={handleProposeSubmit}
-                onCancel={() => setIsModalVisible(false)}
-                confirmLoading={isWalletPending || isTxLoading}
-                okText="发送交易 (Sepolia)"
-                cancelText="取消"
-                destroyOnClose
-                width={520}
-            >
+            <Modal title={<b>创建新治理提案</b>} open={isModalVisible} onOk={handleProposeSubmit} onCancel={() => setIsModalVisible(false)} confirmLoading={isWalletPending || isTxLoading} okText="发送交易" cancelText="取消" destroyOnClose width={520}>
                 <Form form={form} layout="vertical" className="mt-4">
-                    <Form.Item
-                        name="description"
-                        label="提案内容"
-                        rules={[{ required: true, message: '请描述您的提案用途' }]}
-                    >
-                        <Input.TextArea placeholder="例如：支付 2026 Q1 社区运营费用" rows={3} />
-                    </Form.Item>
-
-                    <Form.Item
-                        name="amount"
-                        label="申请金额 (ETH)"
-                        extra={<Text type="secondary" style={{ fontSize: '12px' }}>* 系统会自动转换为 Wei 提交至以太坊网络</Text>}
-                        rules={[{ required: true, message: '请输入金额' }]}
-                    >
-                        <InputNumber
-                            style={{ width: '100%' }}
-                            min={0.000001}
-                            placeholder="0.1"
-                            precision={6}
-                        />
-                    </Form.Item>
-
-                    <Form.Item
-                        name="receiver"
-                        label="收款钱包地址"
-                        rules={[
-                            { required: true, message: '请输入收款人地址' },
-                            { pattern: /^0x[a-fA-F0-9]{40}$/, message: '无效的以太坊地址格式' }
-                        ]}
-                    >
-                        <Input placeholder="0x..." spellCheck={false} />
-                    </Form.Item>
+                    <Form.Item name="description" label="提案内容" rules={[{ required: true, message: '请描述您的提案用途' }]}><Input.TextArea rows={3} /></Form.Item>
+                    <Form.Item name="amount" label="申请金额 (ETH)" rules={[{ required: true, message: '请输入金额' }]}><InputNumber style={{ width: '100%' }} min={0.000001} precision={6} /></Form.Item>
+                    <Form.Item name="receiver" label="收款钱包地址" rules={[{ required: true, message: '请输入收款人地址' }, { pattern: /^0x[a-fA-F0-9]{40}$/, message: '无效格式' }]}><Input spellCheck={false} /></Form.Item>
                 </Form>
+            </Modal>
+
+            <Modal title={<b>提案详细信息</b>} open={isDetailVisible} onCancel={() => setIsDetailVisible(false)} footer={[<Button key="close" onClick={() => setIsDetailVisible(false)}>关闭</Button>]} width={600}>
+                {currentProposal && (
+                    <Descriptions column={1} bordered size="small" style={{ marginTop: '16px' }}>
+                        <Descriptions.Item label="完整提案 ID"><Text copyable>{currentProposal.id}</Text></Descriptions.Item>
+                        <Descriptions.Item label="提案描述">{currentProposal.description}</Descriptions.Item>
+                        <Descriptions.Item label="申请金额"><Text strong type="danger">{formatEther(BigInt(currentProposal.amount))} ETH</Text></Descriptions.Item>
+                        <Descriptions.Item label="收款人地址"><Text copyable>{currentProposal.receiver}</Text></Descriptions.Item>
+                        <Descriptions.Item label="当前赞成票"><Tag color="blue">{currentProposal.votesFor || 0} 票</Tag></Descriptions.Item>
+                        <Descriptions.Item label="执行状态">{currentProposal.executed ? <Tag color="success">已拨付完成</Tag> : <Tag color="processing">投票中 / 待执行</Tag>}</Descriptions.Item>
+                    </Descriptions>
+                )}
             </Modal>
         </Card>
     );

@@ -4,27 +4,36 @@ import type { Proposal } from './types';
 export const governanceABI = [
     {
         "inputs": [
-            { "name": "_desc", "type": "string" },
-            { "name": "_amount", "type": "uint256" },
-            { "name": "_receiver", "type": "address" }
+            { "name": "targets", "type": "address[]" },
+            { "name": "values", "type": "uint256[]" },
+            { "name": "calldatas", "type": "bytes[]" },
+            { "name": "description", "type": "string" }
         ],
         "name": "propose",
-        "outputs": [],
+        "outputs": [{ "name": "proposalId", "type": "uint256" }],
         "stateMutability": "nonpayable",
         "type": "function"
     },
     {
-        "inputs": [{ "name": "_pid", "type": "uint256" }],
-        "name": "vote",
-        "outputs": [],
+        "inputs": [
+            { "name": "proposalId", "type": "uint256" },
+            { "name": "support", "type": "uint8" }
+        ],
+        "name": "castVote",
+        "outputs": [{ "name": "weight", "type": "uint256" }],
         "stateMutability": "nonpayable",
         "type": "function"
     },
     {
-        "inputs": [{ "name": "_pid", "type": "uint256" }],
-        "name": "executeProposal",
-        "outputs": [],
-        "stateMutability": "nonpayable",
+        "inputs": [
+            { "name": "targets", "type": "address[]" },
+            { "name": "values", "type": "uint256[]" },
+            { "name": "calldatas", "type": "bytes[]" },
+            { "name": "descriptionHash", "type": "bytes32" }
+        ],
+        "name": "execute",
+        "outputs": [{ "name": "", "type": "uint256" }],
+        "stateMutability": "payable",
         "type": "function"
     }
 ] as const;
