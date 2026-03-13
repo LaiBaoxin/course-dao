@@ -28,18 +28,38 @@ func NewListProposalsLogic(ctx context.Context, svcCtx *svc.ServiceContext) *Lis
 
 // ListProposals 获取治理列表
 func (l *ListProposalsLogic) ListProposals(req *types.ListProposalsReq) (resp *types.ListProposalsResp, err error) {
-	query := `
-   SELECT 
-      pid, proposer, description, amount, receiver,
-      toString((SELECT ifNull(sum(toUInt64(weight)), 0) FROM course_dao.vote_events WHERE toString(pid) = toString(p.pid))) as votes,
-      (SELECT count() FROM course_dao.proposal_executed_events WHERE toString(pid) = toString(p.pid)) as executed
-   FROM course_dao.proposal_created_events AS p
-   ORDER BY event_time DESC
-`
+	page := req.Page
+	if page <= 0 {
+		page = 1
+	}
+	pageSize := req.Size
+	if pageSize <= 0 {
+		// 默认 6 条数据
+		pageSize = 6
+	}
+	offset := (page - 1) * pageSize
 
-	rows, err := l.svcCtx.Conn.Query(l.ctx, query)
+	var total uint64
+	countQuery := `SELECT count(*) FROM course_dao.proposal_created_events`
+	err = l.svcCtx.Conn.QueryRow(l.ctx, countQuery).Scan(&total)
 	if err != nil {
-		logx.Errorf("查询 ClickHouse 失败: %v", err)
+		logx.Errorf("查询 ClickHouse 提案总数失败: %v", err)
+		return nil, err
+	}
+
+	query := `
+		SELECT 
+			p.pid, p.proposer, p.description, p.amount, p.receiver,
+			toString((SELECT ifNull(sum(toUInt64(weight)), 0) FROM course_dao.vote_events WHERE toString(pid) = toString(p.pid))) as votes,
+			(SELECT count() FROM course_dao.proposal_executed_events WHERE toString(pid) = toString(p.pid)) as executed
+		FROM course_dao.proposal_created_events AS p
+		ORDER BY p.block_number DESC 
+		LIMIT ? OFFSET ?
+	`
+
+	rows, err := l.svcCtx.Conn.Query(l.ctx, query, pageSize, offset)
+	if err != nil {
+		logx.Errorf("查询 ClickHouse 提案列表失败: %v", err)
 		return nil, err
 	}
 	defer rows.Close()
@@ -73,6 +93,7 @@ func (l *ListProposalsLogic) ListProposals(req *types.ListProposalsReq) (resp *t
 	}
 
 	return &types.ListProposalsResp{
-		List: list,
+		List:  list,
+		Total: int64(total),
 	}, nil
 }

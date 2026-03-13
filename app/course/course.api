@@ -21,7 +21,8 @@ type (
 		Size uint32 `form:"size,optional"`
 	}
 	ListProposalsResp {
-		List []Proposal `json:"list"`
+		List  []Proposal `json:"list"`
+		Total int64      `json:"total"`
 	}
 	ProposalDetailReq {
 		Id string `path:"id"`

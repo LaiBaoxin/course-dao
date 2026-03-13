@@ -17,7 +17,8 @@ type ListProposalsReq struct {
 }
 
 type ListProposalsResp struct {
-	List []Proposal `json:"list"`
+	List  []Proposal `json:"list"`
+	Total int64      `json:"total"`
 }
 
 type Proposal struct {
