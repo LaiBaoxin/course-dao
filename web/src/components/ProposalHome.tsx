@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { Card, Table, Tag, Typography, message, Button, Space, Modal, Form, Input, InputNumber, Tooltip, Descriptions } from 'antd';
-import { PlusOutlined, ReloadOutlined, ShoppingCartOutlined } from '@ant-design/icons';
+import { PlusOutlined, ReloadOutlined, DollarOutlined } from '@ant-design/icons';
 import { getProposals } from '../api/governance';
 import type { Proposal } from '../api/types';
 import { useWriteContract, useWaitForTransactionReceipt, useBalance, useAccount } from 'wagmi';
@@ -27,24 +27,35 @@ const ProposalHome: React.FC = () => {
     const { writeContract, data: hash, isPending: isWalletPending } = useWriteContract();
     const { isSuccess: isConfirming, isLoading: isTxLoading } = useWaitForTransactionReceipt({ hash });
 
+    const [currentPage, setCurrentPage] = useState<number>(1);
+    const [pageSize, setPageSize] = useState<number>(6);
+    const [total, setTotal] = useState<number>(0);
+
     // 获取国库实时余额
     const { data: treasuryBalance, refetch: refetchBalance } = useBalance({ address: GOVERNOR_ADDRESS });
 
-    const fetchData = useCallback(async () => {
+    const fetchData = useCallback(async (page = currentPage, currentSize = pageSize) => {
         try {
             setLoading(true);
-            const res = await getProposals();
+            // 将分页参数传给后端 API
+            const res = await getProposals({ page, size: currentSize });
+
             const actualData = (res as any).data ? (res as any).data : res;
+
             if (actualData && actualData.list) {
                 setProposals(actualData.list);
+                setTotal(actualData.total || 0);
+            } else {
+                setProposals([]);
+                setTotal(0);
             }
-            refetchBalance(); // 顺便刷新一下国库余额
+            refetchBalance(); // 刷新国库余额
         } catch (e) {
             message.error("从数据库同步数据失败");
         } finally {
             setLoading(false);
         }
-    }, [refetchBalance]);
+    }, [currentPage, pageSize, refetchBalance]);
 
     useEffect(() => {
         fetchData();
@@ -189,7 +200,7 @@ const ProposalHome: React.FC = () => {
                     </div>
                 </div>
                 <Space size="middle">
-                    <Button type="dashed" size="large" icon={<ShoppingCartOutlined />} onClick={handleBuyMedal} style={{ borderRadius: '8px', borderColor: '#faad14', color: '#faad14' }} loading={isWalletPending || isTxLoading}>
+                    <Button type="dashed" size="large" icon={<DollarOutlined />} onClick={handleBuyMedal} style={{ borderRadius: '8px', borderColor: '#faad14', color: '#faad14' }} loading={isWalletPending || isTxLoading}>
                         申购勋章 (0.01 ETH)
                     </Button>
 
@@ -201,12 +212,31 @@ const ProposalHome: React.FC = () => {
                     <Button type="primary" size="large" icon={<PlusOutlined />} onClick={() => setIsModalVisible(true)} style={{ borderRadius: '8px', fontWeight: 'bold' }}>
                         发起提案
                     </Button>
-                    <Button icon={<ReloadOutlined />} onClick={fetchData} loading={loading} style={{ borderRadius: '8px' }}>刷新</Button>
+                    <Button icon={<ReloadOutlined />} onClick={() => fetchData()} loading={loading} style={{ borderRadius: '8px' }}>刷新</Button>
                 </Space>
             </div>
 
-            <Table dataSource={proposals} columns={columns} loading={loading} rowKey={(record) => `${record.id}-${record.description}`} pagination={{ pageSize: 6 }} style={{ background: '#fff', borderRadius: '8px' }} />
-
+            <Table
+                dataSource={proposals}
+                columns={columns}
+                loading={loading}
+                rowKey={(record) => `${record.id}-${record.description}`}
+                style={{ background: '#fff', borderRadius: '8px' }}
+                pagination={{
+                    current: currentPage,     // 当前页码
+                    pageSize: pageSize,       // 每页条数
+                    total: total,             // 总条数（重要！没有它分页器画不出来）
+                    showSizeChanger: true,    // 允许用户切换每页显示多少条
+                    pageSizeOptions: ['6', '10', '20', '50'],
+                    showTotal: (total) => `共 ${total} 条提案`, // 左侧显示总数
+                    onChange: (page, size) => {
+                        // 当用户点击下一页，或者切换每页条数时触发
+                        setCurrentPage(page);
+                        setPageSize(size);
+                        fetchData(page, size); // 重新向后端拉取数据
+                    },
+                }}
+            />
             <Modal title={<b>创建新治理提案</b>} open={isModalVisible} onOk={handleProposeSubmit} onCancel={() => setIsModalVisible(false)} confirmLoading={isWalletPending || isTxLoading} okText="发送交易" cancelText="取消" destroyOnClose width={520}>
                 <Form form={form} layout="vertical" className="mt-4">
                     <Form.Item name="description" label="提案内容" rules={[{ required: true, message: '请描述您的提案用途' }]}><Input.TextArea rows={3} /></Form.Item>

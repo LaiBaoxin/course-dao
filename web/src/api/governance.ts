@@ -43,6 +43,6 @@ export interface ListProposalsResp {
 }
 
 // 获取提案列表
-export const getProposals = async () => {
-    return await request.get<ListProposalsResp>('http://localhost:8889/v1/governance/proposals');
+export const getProposals = async (params: { page: number; size: number }) => {
+    return request.get('http://localhost:8889/v1/governance/proposals', {params});
 };
