@@ -22,18 +22,33 @@ func NewCheckMedalMiddleware(medalRpc medalclient.Medal) *CheckMedalMiddleware {
 
 func (m *CheckMedalMiddleware) Handle(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		// 从 JWT 中拿到用户地址
-		userAddr := r.Context().Value("address").(string)
+		val := r.Context().Value("wallet")
+		userAddr, ok := val.(string)
 
-		// 跨服调用：通过 medal-rpc 查询此用户有没有勋章
+		if !ok || userAddr == "" {
+			// 如果没拿到地址，返回 401 或 403，而不是崩溃
+			httpx.WriteJson(w, http.StatusUnauthorized, map[string]string{
+				"error": "未能在授权信息中找到钱包地址",
+			})
+			return
+		}
+
+		if m.medalRpc == nil {
+			httpx.WriteJson(w, http.StatusInternalServerError, map[string]string{
+				"error": "勋章校验服务暂不可用",
+			})
+			return
+		}
+
+		// 跨服调用
 		resp, err := m.medalRpc.GetMedalsByAddress(r.Context(), &medalclient.GetMedalsReq{
 			Address: userAddr,
 		})
 
-		// 如果 RPC 出错，或者返回列表为空，说明没有“入场券”
+		// 如果 RPC 出错，或者返回列表为空
 		if err != nil || resp == nil || len(resp.Medals) == 0 {
 			httpx.WriteJson(w, http.StatusForbidden, map[string]string{
-				"error": "抱歉，本课程仅限 Course DAO 勋章持有者访问。请先申领勋章！",
+				"error": "权限不足：本课程仅限 Course DAO 勋章持有者访问。",
 			})
 			return
 		}

@@ -27,7 +27,8 @@ func NewGetPremiumCourseLogic(ctx context.Context, svcCtx *svc.ServiceContext) *
 }
 
 func (l *GetPremiumCourseLogic) GetPremiumCourse(req *types.CourseReq) (resp *types.CourseResp, err error) {
-	// todo: add your logic here and delete this line
-
-	return
+	return &types.CourseResp{
+		Title:    "Course DAO 绝密内参：Web3 全栈架构师成长之路",
+		VideoUrl: "https://blog.csdn.net/weixin_47024018?spm=1000.2115.3001.10640", // 这里放你的真实视频流地址
+	}, nil
 }

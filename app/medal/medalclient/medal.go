@@ -7,7 +7,7 @@ package medalclient
 import (
 	"context"
 
-	"github.com/wwater/course-dao/app/medal/medal"
+	"github.com/wwater/course-dao/app/medal/medal/medal"
 
 	"github.com/zeromicro/go-zero/zrpc"
 	"google.golang.org/grpc"

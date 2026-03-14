@@ -48,13 +48,18 @@ func (l *ListProposalsLogic) ListProposals(req *types.ListProposalsReq) (resp *t
 	}
 
 	query := `
-		SELECT 
-			p.pid, p.proposer, p.description, p.amount, p.receiver,
-			toString((SELECT ifNull(sum(toUInt64(weight)), 0) FROM course_dao.vote_events WHERE toString(pid) = toString(p.pid))) as votes,
-			(SELECT count() FROM course_dao.proposal_executed_events WHERE toString(pid) = toString(p.pid)) as executed
-		FROM course_dao.proposal_created_events AS p
-		ORDER BY p.block_number DESC 
-		LIMIT ? OFFSET ?
+	   SELECT 
+		  p.pid, 
+		  any(p.proposer), 
+		  any(p.description), 
+		  any(p.amount), 
+		  any(p.receiver),
+		  toString((SELECT ifNull(sum(toUInt64(weight)), 0) FROM course_dao.vote_events WHERE toString(pid) = toString(p.pid))) as votes,
+		  (SELECT count() FROM course_dao.proposal_executed_events WHERE toString(pid) = toString(p.pid)) as executed
+	   FROM course_dao.proposal_created_events AS p
+	   GROUP BY p.pid
+	   ORDER BY any(p.block_number) DESC 
+	   LIMIT ? OFFSET ?
 	`
 
 	rows, err := l.svcCtx.Conn.Query(l.ctx, query, pageSize, offset)

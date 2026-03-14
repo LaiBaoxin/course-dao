@@ -7,6 +7,8 @@ type Config struct {
 		VaultAddress    string // 国库合约地址
 		StartBlock      int64  // 勋章合约的区块
 		VaultStartBlock int64  // 国库合约的区块
+		MedalABIPath    string // medalAbi 地址
+		VaultABIPath    string // vaultAbi 地址
 	}
 	ClickHouse struct {
 		Addr     []string

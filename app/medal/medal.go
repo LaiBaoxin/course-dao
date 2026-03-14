@@ -3,12 +3,11 @@ package main
 import (
 	"flag"
 	"fmt"
+	"github.com/wwater/course-dao/app/medal/medal/medal"
 
 	"github.com/wwater/course-dao/app/medal/internal/config"
 	"github.com/wwater/course-dao/app/medal/internal/server"
 	"github.com/wwater/course-dao/app/medal/internal/svc"
-	"github.com/wwater/course-dao/app/medal/medal"
-
 	"github.com/zeromicro/go-zero/core/conf"
 	"github.com/zeromicro/go-zero/core/service"
 	"github.com/zeromicro/go-zero/zrpc"

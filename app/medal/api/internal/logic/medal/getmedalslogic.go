@@ -4,7 +4,7 @@ import (
 	"context"
 	"github.com/wwater/course-dao/app/medal/api/internal/svc"
 	"github.com/wwater/course-dao/app/medal/api/internal/types"
-	"github.com/wwater/course-dao/app/medal/medal"
+	"github.com/wwater/course-dao/app/medal/medal/medal"
 
 	"github.com/zeromicro/go-zero/core/logx"
 )
@@ -37,6 +37,7 @@ func (l *GetMedalsLogic) GetMedals(req *types.GetMedalsReq) (resp *types.GetMeda
 				TokenId:     m.TokenId,
 				TxHash:      m.TxHash,
 				BlockNumber: m.BlockNumber,
+				Level:       m.Level,
 			})
 		}
 	} else {

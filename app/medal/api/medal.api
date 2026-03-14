@@ -1,69 +1,71 @@
 syntax = "v1"
 
 type (
-    // 登录认证
-    NonceReq {
-        Address string `json:"address"`
-    }
-    NonceResp {
-        Nonce string `json:"nonce"`
-    }
-    LoginReq {
-        Address   string `json:"address"`
-        Message   string `json:"message"`
-        Signature string `json:"signature"`
-    }
-    LoginResp {
-        Token string `json:"token"`
-    }
-
-    // 勋章查询
-    GetMedalsReq {
-        Address string `path:"address"`
-    }
-    MedalInfo {
-        TokenId     uint64 `json:"tokenId"`
-        TxHash      string `json:"txHash"`
-        BlockNumber uint64 `json:"blockNumber"`
-    }
-    GetMedalsResp {
-        Medals           []MedalInfo `json:"medals"`
-        Proof            []string    `json:"proof"`
-        ClaimableTokenId uint64      `json:"claimableTokenId"`
-    }
-    MedalDetailReq {
-        TokenId uint64 `path:"tokenId"`
-    }
-    MedalDetailRes {
-        Name        string `json:"name"`
-        Description string `json:"description"`
-        Image       string `json:"image"`
-        Type        string `json:"type"`
-        CreateTime  string `json:"createTime"`
-        TxHash      string `json:"txHash"`
-    }
+	// 登录认证
+	NonceReq {
+		Address string `json:"address"`
+	}
+	NonceResp {
+		Nonce string `json:"nonce"`
+	}
+	LoginReq {
+		Address   string `json:"address"`
+		Message   string `json:"message"`
+		Signature string `json:"signature"`
+	}
+	LoginResp {
+		Token string `json:"token"`
+	}
+	// 勋章查询
+	GetMedalsReq {
+		Address string `path:"address"`
+	}
+	MedalInfo {
+		TokenId     uint64 `json:"tokenId"`
+		TxHash      string `json:"txHash"`
+		BlockNumber uint64 `json:"blockNumber"`
+		Level       uint32 `json:"level"`
+	}
+	GetMedalsResp {
+		Medals           []MedalInfo `json:"medals"`
+		Proof            []string    `json:"proof"`
+		ClaimableTokenId uint64      `json:"claimableTokenId"`
+	}
+	MedalDetailReq {
+		TokenId uint64 `path:"tokenId"`
+	}
+	MedalDetailRes {
+		Name        string `json:"name"`
+		Description string `json:"description"`
+		Image       string `json:"image"`
+		Type        string `json:"type"`
+		CreateTime  string `json:"createTime"`
+		TxHash      string `json:"txHash"`
+		Level       uint32 `json:"level"`
+	}
 )
 
 @server (
-    prefix: /v1/auth
-    group:  auth
+	prefix: /v1/auth
+	group:  auth
 )
 service medal-api {
-    @handler getNonce
-    post /nonce (NonceReq) returns (NonceResp)
+	@handler getNonce
+	post /nonce (NonceReq) returns (NonceResp)
 
-    @handler login
-    post /login (LoginReq) returns (LoginResp)
+	@handler login
+	post /login (LoginReq) returns (LoginResp)
 }
 
 @server (
-    prefix: /v1/medals
-    group:  medal
+	prefix: /v1/medals
+	group:  medal
 )
 service medal-api {
-    @handler GetMedals
-    get /list/:address (GetMedalsReq) returns (GetMedalsResp)
+	@handler GetMedals
+	get /list/:address (GetMedalsReq) returns (GetMedalsResp)
 
-    @handler GetMedalDetail
-    get /detail/:tokenId (MedalDetailReq) returns (MedalDetailRes)
+	@handler GetMedalDetail
+	get /detail/:tokenId (MedalDetailReq) returns (MedalDetailRes)
 }
+

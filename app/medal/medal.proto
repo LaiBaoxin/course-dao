@@ -11,6 +11,7 @@ message MedalInfo {
   uint64 token_id = 1;
   string tx_hash = 2;
   uint64 block_number = 3;
+  uint32 level = 4;
 }
 
 message GetMedalsResp {
@@ -35,6 +36,7 @@ message MedalDetail {
   string txHash = 2;
   uint64 blockNumber = 3;
   string mintTime = 4;
+  uint32 level = 5;
 }
 
 service Medal {

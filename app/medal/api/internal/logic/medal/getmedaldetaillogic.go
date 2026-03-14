@@ -6,10 +6,9 @@ package medal
 import (
 	"context"
 	"fmt"
-	"github.com/wwater/course-dao/app/medal/medalclient"
-
 	"github.com/wwater/course-dao/app/medal/api/internal/svc"
 	"github.com/wwater/course-dao/app/medal/api/internal/types"
+	"github.com/wwater/course-dao/app/medal/medalclient"
 
 	"github.com/zeromicro/go-zero/core/logx"
 )
@@ -35,31 +34,27 @@ func (l *GetMedalDetailLogic) GetMedalDetail(req *types.MedalDetailReq) (resp *t
 	})
 
 	if err != nil {
-		// 而不是直接抛出 400 错误让前端挂掉
-		l.Errorf("ClickHouse 未命中: %v", err)
-		return &types.MedalDetailRes{
-			Name:        fmt.Sprintf("Course DAO 勋章 #%d", req.TokenId),
-			Description: "该勋章已在链上铸造，Indexer 正在拼命同步中，请稍后刷新查看详情。",
-			Image:       "https://profile-avatar.csdnimg.cn/5ba0da009be64b6f809b85e0990b2146_weixin_47024018.jpg!1", // 后期改用 IPFS
-			Type:        "Processing",
-			CreateTime:  "同步中...",
-			TxHash:      "",
-		}, nil
+		l.Errorf("RPC 详情查询失败: %v", err)
+		return nil, err // 或者返回兜底数据
 	}
 
 	return &types.MedalDetailRes{
-		Name:        fmt.Sprintf("Course DAO 贡献勋章 #%d", req.TokenId),
-		Description: "此勋章由 Course DAO 智能合约签发，代表您在 Web3 转型计划中的代码贡献。",
-		Image:       "https://profile-avatar.csdnimg.cn/5ba0da009be64b6f809b85e0990b2146_weixin_47024018.jpg!1", // 后期改用 IPFS
-		Type:        l.getMedalLevel(req.TokenId),
+		Name:        fmt.Sprintf("Course DAO 贡献勋章 #%d", rpcResp.TokenId),
+		Description: "此勋章代表您的 DAO 治理身份",
+		Image:       "https://...",
+		Type:        "Medal",
 		CreateTime:  rpcResp.MintTime,
 		TxHash:      rpcResp.TxHash,
+		Level:       rpcResp.Level,
 	}, nil
 }
-
-func (l *GetMedalDetailLogic) getMedalLevel(id uint64) string {
-	if id <= 50 {
-		return "Genesis"
+func (l *GetMedalDetailLogic) getMedalLevelName(level uint32) string {
+	switch level {
+	case 2:
+		return "Gold Member"
+	case 1:
+		return "Silver Member"
+	default:
+		return "Bronze Member"
 	}
-	return "Contributor"
 }

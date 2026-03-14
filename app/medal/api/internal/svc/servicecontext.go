@@ -18,14 +18,13 @@ type ServiceContext struct {
 	Config               config.Config
 	MedalRpc             medalclient.Medal
 	MedalContract        *medal.CourseMedal
-	CheckMedalMiddleware rest.Middleware // 注册自定义中间件
+	CheckMedalMiddleware rest.Middleware
 }
 
 func NewServiceContext(c config.Config) *ServiceContext {
-	// 初始化以太坊客户端
 	client, err := ethclient.Dial(c.Eth.Rpc)
 	if err != nil {
-		panic("无法连接到 Foundry 节点: " + err.Error())
+		panic("无法连接到链节点: " + err.Error())
 	}
 
 	// 实例化合约对象
@@ -35,12 +34,13 @@ func NewServiceContext(c config.Config) *ServiceContext {
 		panic("合约绑定失败: " + err.Error())
 	}
 
-	medalRpc := medalclient.NewMedal(zrpc.MustNewClient(c.MedalRpc))
+	// 初始化 RPC 客户端
+	mRpc := medalclient.NewMedal(zrpc.MustNewClient(c.MedalRpc))
 
 	return &ServiceContext{
 		Config:               c,
-		MedalRpc:             medalRpc,
+		MedalRpc:             mRpc,
 		MedalContract:        medalContract,
-		CheckMedalMiddleware: middleware.NewCheckMedalMiddleware(medalRpc).Handle,
+		CheckMedalMiddleware: middleware.NewCheckMedalMiddleware(mRpc).Handle,
 	}
 }

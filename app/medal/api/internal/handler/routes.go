@@ -4,11 +4,10 @@
 package handler
 
 import (
-	"github.com/wwater/course-dao/app/medal/api/internal/handler/medal"
 	"net/http"
 
 	auth "github.com/wwater/course-dao/app/medal/api/internal/handler/auth"
-	course "github.com/wwater/course-dao/app/medal/api/internal/handler/course"
+	medal "github.com/wwater/course-dao/app/medal/api/internal/handler/medal"
 	"github.com/wwater/course-dao/app/medal/api/internal/svc"
 
 	"github.com/zeromicro/go-zero/rest"
@@ -18,28 +17,11 @@ func RegisterHandlers(server *rest.Server, serverCtx *svc.ServiceContext) {
 	server.AddRoutes(
 		[]rest.Route{
 			{
-				Method:  http.MethodGet,
-				Path:    "/v1/medals/:address",
-				Handler: medal.GetMedalsHandler(serverCtx),
-			},
-			{
-				Method:  http.MethodGet,
-				Path:    "/v1/medals/detail/:tokenId",
-				Handler: medal.GetMedalDetailHandler(serverCtx),
-			},
-		},
-	)
-
-	server.AddRoutes(
-		[]rest.Route{
-			{
-				// 钱包签名登录
 				Method:  http.MethodPost,
 				Path:    "/login",
 				Handler: auth.LoginHandler(serverCtx),
 			},
 			{
-				// 获取登录随机数
 				Method:  http.MethodPost,
 				Path:    "/nonce",
 				Handler: auth.GetNonceHandler(serverCtx),
@@ -49,18 +31,18 @@ func RegisterHandlers(server *rest.Server, serverCtx *svc.ServiceContext) {
 	)
 
 	server.AddRoutes(
-		rest.WithMiddlewares(
-			[]rest.Middleware{serverCtx.CheckMedalMiddleware},
-			[]rest.Route{
-				{
-					// 获取高级课程视频 (仅限 Course DAO 勋章持有者)
-					Method:  http.MethodGet,
-					Path:    "/premium",
-					Handler: course.GetPremiumCourseHandler(serverCtx),
-				},
-			}...,
-		),
-		rest.WithJwt(serverCtx.Config.Auth.AccessSecret),
-		rest.WithPrefix("/v1/course"),
+		[]rest.Route{
+			{
+				Method:  http.MethodGet,
+				Path:    "/detail/:tokenId",
+				Handler: medal.GetMedalDetailHandler(serverCtx),
+			},
+			{
+				Method:  http.MethodGet,
+				Path:    "/list/:address",
+				Handler: medal.GetMedalsHandler(serverCtx),
+			},
+		},
+		rest.WithPrefix("/v1/medals"),
 	)
 }

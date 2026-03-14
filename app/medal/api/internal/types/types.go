@@ -3,14 +3,6 @@
 
 package types
 
-type CourseReq struct {
-}
-
-type CourseResp struct {
-	VideoUrl string `json:"video_url"`
-	Title    string `json:"title"`
-}
-
 type GetMedalsReq struct {
 	Address string `path:"address"`
 }
@@ -42,12 +34,14 @@ type MedalDetailRes struct {
 	Type        string `json:"type"`
 	CreateTime  string `json:"createTime"`
 	TxHash      string `json:"txHash"`
+	Level       uint32 `json:"level"`
 }
 
 type MedalInfo struct {
 	TokenId     uint64 `json:"tokenId"`
 	TxHash      string `json:"txHash"`
 	BlockNumber uint64 `json:"blockNumber"`
+	Level       uint32 `json:"level"`
 }
 
 type NonceReq struct {

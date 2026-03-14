@@ -3,13 +3,12 @@ package logic
 import (
 	"context"
 	"errors"
+	"github.com/wwater/course-dao/app/medal/medal/medal"
 	"strings"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/wwater/course-dao/app/medal/internal/svc"
 	"github.com/wwater/course-dao/app/medal/internal/utils"
-	"github.com/wwater/course-dao/app/medal/medal"
-
 	"github.com/zeromicro/go-zero/core/logx"
 )
 

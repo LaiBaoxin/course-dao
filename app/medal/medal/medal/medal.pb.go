@@ -70,6 +70,7 @@ type MedalInfo struct {
 	TokenId       uint64                 `protobuf:"varint,1,opt,name=token_id,json=tokenId,proto3" json:"token_id,omitempty"`
 	TxHash        string                 `protobuf:"bytes,2,opt,name=tx_hash,json=txHash,proto3" json:"tx_hash,omitempty"`
 	BlockNumber   uint64                 `protobuf:"varint,3,opt,name=block_number,json=blockNumber,proto3" json:"block_number,omitempty"`
+	Level         uint32                 `protobuf:"varint,4,opt,name=level,proto3" json:"level,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -121,6 +122,13 @@ func (x *MedalInfo) GetTxHash() string {
 func (x *MedalInfo) GetBlockNumber() uint64 {
 	if x != nil {
 		return x.BlockNumber
+	}
+	return 0
+}
+
+func (x *MedalInfo) GetLevel() uint32 {
+	if x != nil {
+		return x.Level
 	}
 	return 0
 }
@@ -315,6 +323,7 @@ type MedalDetail struct {
 	TxHash        string                 `protobuf:"bytes,2,opt,name=txHash,proto3" json:"txHash,omitempty"`
 	BlockNumber   uint64                 `protobuf:"varint,3,opt,name=blockNumber,proto3" json:"blockNumber,omitempty"`
 	MintTime      string                 `protobuf:"bytes,4,opt,name=mintTime,proto3" json:"mintTime,omitempty"`
+	Level         uint32                 `protobuf:"varint,5,opt,name=level,proto3" json:"level,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -377,17 +386,25 @@ func (x *MedalDetail) GetMintTime() string {
 	return ""
 }
 
+func (x *MedalDetail) GetLevel() uint32 {
+	if x != nil {
+		return x.Level
+	}
+	return 0
+}
+
 var File_medal_proto protoreflect.FileDescriptor
 
 const file_medal_proto_rawDesc = "" +
 	"\n" +
 	"\vmedal.proto\x12\x05medal\"(\n" +
 	"\fGetMedalsReq\x12\x18\n" +
-	"\aaddress\x18\x01 \x01(\tR\aaddress\"b\n" +
+	"\aaddress\x18\x01 \x01(\tR\aaddress\"x\n" +
 	"\tMedalInfo\x12\x19\n" +
 	"\btoken_id\x18\x01 \x01(\x04R\atokenId\x12\x17\n" +
 	"\atx_hash\x18\x02 \x01(\tR\x06txHash\x12!\n" +
-	"\fblock_number\x18\x03 \x01(\x04R\vblockNumber\"9\n" +
+	"\fblock_number\x18\x03 \x01(\x04R\vblockNumber\x12\x14\n" +
+	"\x05level\x18\x04 \x01(\rR\x05level\"9\n" +
 	"\rGetMedalsResp\x12(\n" +
 	"\x06medals\x18\x01 \x03(\v2\x10.medal.MedalInfoR\x06medals\",\n" +
 	"\x10GetMedalProofReq\x12\x18\n" +
@@ -396,12 +413,13 @@ const file_medal_proto_rawDesc = "" +
 	"\x05proof\x18\x01 \x03(\tR\x05proof\x12\x18\n" +
 	"\atokenId\x18\x02 \x01(\x04R\atokenId\"0\n" +
 	"\x14GetMedalByTokenIdReq\x12\x18\n" +
-	"\atokenId\x18\x01 \x01(\x04R\atokenId\"}\n" +
+	"\atokenId\x18\x01 \x01(\x04R\atokenId\"\x93\x01\n" +
 	"\vMedalDetail\x12\x18\n" +
 	"\atokenId\x18\x01 \x01(\x04R\atokenId\x12\x16\n" +
 	"\x06txHash\x18\x02 \x01(\tR\x06txHash\x12 \n" +
 	"\vblockNumber\x18\x03 \x01(\x04R\vblockNumber\x12\x1a\n" +
-	"\bmintTime\x18\x04 \x01(\tR\bmintTime2\xd2\x01\n" +
+	"\bmintTime\x18\x04 \x01(\tR\bmintTime\x12\x14\n" +
+	"\x05level\x18\x05 \x01(\rR\x05level2\xd2\x01\n" +
 	"\x05Medal\x12?\n" +
 	"\x12GetMedalsByAddress\x12\x13.medal.GetMedalsReq\x1a\x14.medal.GetMedalsResp\x12B\n" +
 	"\rGetMedalProof\x12\x17.medal.GetMedalProofReq\x1a\x18.medal.GetMedalProofResp\x12D\n" +

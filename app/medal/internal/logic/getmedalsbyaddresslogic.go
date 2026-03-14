@@ -2,14 +2,10 @@ package logic
 
 import (
 	"context"
-	"fmt"
-	"math/big"
-	"strings"
-
 	"github.com/wwater/course-dao/app/medal/internal/svc"
-	"github.com/wwater/course-dao/app/medal/medal"
-
+	"github.com/wwater/course-dao/app/medal/medal/medal"
 	"github.com/zeromicro/go-zero/core/logx"
+	"strings"
 )
 
 type GetMedalsByAddressLogic struct {
@@ -28,46 +24,37 @@ func NewGetMedalsByAddressLogic(ctx context.Context, svcCtx *svc.ServiceContext)
 
 // GetMedalsByAddress 根据地址获取勋章列表（已加入去重逻辑）
 func (l *GetMedalsByAddressLogic) GetMedalsByAddress(in *medal.GetMedalsReq) (*medal.GetMedalsResp, error) {
+	query := `
+        SELECT token_id, transaction_hash, block_number, level 
+        FROM course_dao.medal_mint_events 
+        WHERE lower(to_address) = lower(?)
+    `
+
+	// 将输入地址也转为小写
 	searchAddr := strings.ToLower(in.Address)
 
-	var results []struct {
-		TokenId     *big.Int `ch:"token_id"`
-		TxHash      string   `ch:"transaction_hash"`
-		BlockNumber uint64   `ch:"block_number"`
-	}
-
-	// 使用 argMax 确保每个 token_id 只返回 block_number 最大（最新）的那条数据
-	query := `
-		SELECT 
-			token_id, 
-			argMax(transaction_hash, block_number) as transaction_hash, 
-			max(block_number) as block_number
-		FROM course_dao.medal_mint_events 
-		WHERE to_address = ?
-		GROUP BY token_id
-	`
-
-	// 处理后的 searchAddr 进行查询
-	err := l.svcCtx.Conn.Select(l.ctx, &results, query, searchAddr)
+	rows, err := l.svcCtx.Conn.Query(l.ctx, query, searchAddr)
 	if err != nil {
-		logx.Errorf("Query ClickHouse error: %v, address: %s", err, searchAddr)
-		return nil, fmt.Errorf("query clickhouse error: %v", err)
+		l.Errorf("查询 ClickHouse 失败: %v", err)
+		return nil, err
 	}
+	defer rows.Close()
 
-	// 转换并返回结果
 	var medals []*medal.MedalInfo
-	for _, r := range results {
-		tid := uint64(0)
-		if r.TokenId != nil {
-			tid = r.TokenId.Uint64()
+	count := 0 // 记录实际查到了几行数据
+	for rows.Next() {
+		count++
+		var m medal.MedalInfo
+		if err := rows.Scan(&m.TokenId, &m.TxHash, &m.BlockNumber, &m.Level); err != nil {
+			l.Errorf("Scan 失败: %v", err)
+			return nil, err
 		}
-		medals = append(medals, &medal.MedalInfo{
-			TokenId:     tid,
-			TxHash:      r.TxHash,
-			BlockNumber: r.BlockNumber,
-		})
+		medals = append(medals, &m)
 	}
 
-	logx.Infof("Query success, address: %s, unique count: %d", searchAddr, len(medals))
-	return &medal.GetMedalsResp{Medals: medals}, nil
+	l.Infof("查询地址: %s, 命中行数: %d", searchAddr, count)
+
+	return &medal.GetMedalsResp{
+		Medals: medals,
+	}, nil
 }

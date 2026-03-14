@@ -9,7 +9,7 @@ import (
 
 	"github.com/wwater/course-dao/app/medal/internal/logic"
 	"github.com/wwater/course-dao/app/medal/internal/svc"
-	"github.com/wwater/course-dao/app/medal/medal"
+	"github.com/wwater/course-dao/app/medal/medal/medal"
 )
 
 type MedalServer struct {
