@@ -7,5 +7,5 @@ export interface PremiumCourseResp {
 
 // 获取高级课程
 export const getPremiumCourse = () => {
-    return request.get<any, PremiumCourseResp>('/v1/course/premium');
+    return request.get<any, PremiumCourseResp>('http://localhost:8889/v1/course/premium');
 };

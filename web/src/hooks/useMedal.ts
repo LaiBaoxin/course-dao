@@ -1,11 +1,12 @@
-// src/hooks/useMedal.ts
 import { useState, useCallback, useEffect } from 'react';
 import { ethers } from 'ethers';
-import request from '../utils/request';
 import { CONTRACT_ADDRESS, MEDAL_ABI } from '../api/contract';
+import { getMedalsByAddress } from '../api/medal';
+import { useAccount } from 'wagmi';
 import { App as AntdApp } from 'antd';
 import confetti from 'canvas-confetti';
-import { useAccount } from 'wagmi';
+
+// const MEDAL_CONTRACT_ADDRESS = '0x3D28b0bDFbeaf0F8aa29F4e90780f6fb8004BF01';
 
 export const useMedal = () => {
     const { message: msgApi, modal } = AntdApp.useApp();
@@ -24,65 +25,67 @@ export const useMedal = () => {
         setClaimId(null);
     }, []);
 
+    // 获取逻辑
     const fetchData = useCallback(async (rawAddress: string) => {
         if (!rawAddress) return;
         const address = rawAddress.toLowerCase();
 
         try {
-            const response: any = await request.get(`/v1/medals/${address}`);
-            const res = response.data ? response.data : response;
+            setLoading(true);
+            const res = await getMedalsByAddress(address);
+            const data = (res as any).data ? (res as any).data : res;
 
-            // 更新已拥有的勋章
-            const medals = res.medals || [];
+            // 更新用户已拥有的勋章列表
+            const medals = data.medals || [];
             setOwnedMedals(medals);
 
-            // 判断是否显示“领取”按钮
-            const claimableId = Number(res.claimableTokenId);
-
-            // 检查这个 TokenId 是否已经领过
+            // 是否显示白名单领取按钮
+            const claimableId = Number(data.claimableTokenId);
             const isAlreadyOwned = medals.some((m: any) => Number(m.tokenId) === claimableId);
 
-            // 只要后端给出了有效的 claimableTokenId，且用户还没领过
-            // 即使 proof 是空数组 [] (单白名单) 或者是 [hash] (双白名单)，都允许设置状态
-            if (claimableId > 0 && !isAlreadyOwned && res.proof !== null) {
-                setProof(res.proof); // 可能是 []，也可能是 ["0x..."]
+            // 如果后端给出了有效的白名单 ID，且用户还没领过，且有 Proof 数据
+            if (claimableId > 0 && !isAlreadyOwned && data.proof !== null) {
+                setProof(data.proof);
                 setClaimId(claimableId);
-                console.log(`发现可领取勋章: #${claimableId}, Proof长度: ${res.proof.length}`);
+                console.log(`命中白名单: #${claimableId}`);
             } else {
                 setProof([]);
                 setClaimId(null);
             }
         } catch (err) {
-            console.error("Fetch data failed", err);
+            console.error("获取勋章数据失败 (可能是404或网络问题):", err);
+        } finally {
+            setLoading(false);
         }
     }, []);
 
+    // 监听钱包和登录状态
     useEffect(() => {
         const token = localStorage.getItem('course_dao_jwt');
 
         if (isConnected && wagmiAddress && token) {
             setAccount(wagmiAddress);
-            fetchData(wagmiAddress); // 发起真正的网络请求！
-        } else if (!isConnected || !token) {
-            // 如果钱包断开或没有登录，清空状态
+            fetchData(wagmiAddress);
+        } else {
             clearState();
         }
     }, [isConnected, wagmiAddress, fetchData, clearState]);
 
+    // 领取逻辑 (Merkle Proof 领取)
     const handleClaim = async () => {
-        if (claimId === null || claimId === 0) {
-            msgApi.warning({ content: '申领凭证无效，请确保您在白名单中' });
+        if (!claimId) {
+            msgApi.warning({ content: '您当前没有可领取的勋章' });
             return;
         }
 
         if (!window.ethereum) {
-            msgApi.error({ content: '未检测到环境' });
+            msgApi.error({ content: '未检测到以太坊环境 (MetaMask)' });
             return;
         }
 
         modal.confirm({
             title: '确认领取荣誉',
-            content: `即将领取 Course DAO #${claimId} 号勋章，是否继续？`,
+            content: `即将领取 Course DAO #${claimId} 号白名单勋章，点击确定发起交易。`,
             onOk: async () => {
                 try {
                     setLoading(true);
@@ -90,37 +93,29 @@ export const useMedal = () => {
                     const signer = await provider.getSigner();
                     const contract = new ethers.Contract(CONTRACT_ADDRESS, MEDAL_ABI, signer);
 
-                    const rootOnChain = await contract.merkleRoot();
-                    if (rootOnChain === ethers.ZeroHash) {
-                        throw new Error("合约 Merkle Root 未初始化，请联系管理员运行 set_root.go");
-                    }
-
+                    // 发起链上 claim 交易
                     const tx = await contract.claim(proof, claimId);
-                    msgApi.info({ content: '交易已发出，等待链上确认...', duration: 4 });
+                    msgApi.info({ content: '交易已发出，正在同步区块...' });
 
                     await tx.wait();
-                    msgApi.success({ content: `🎉 领取成功！ID: #${claimId}` });
+                    msgApi.success({ content: `🎉 恭喜！勋章 #${claimId} 领取成功` });
 
-                    // 触发全屏烟花效果
+                    // 撒花
                     confetti({
                         zIndex: 9999,
                         particleCount: 150,
-                        spread: 100,
-                        origin: { y: 0.5 },
-                        colors: ['#fadb14', '#1890ff', '#52c41a', '#ff4d4f']
+                        spread: 80,
+                        origin: { y: 0.6 },
+                        colors: ['#D4AF37', '#C0C0C0', '#B87333']
                     });
 
+                    // 领取成功后刷新状态
                     setProof([]);
                     setClaimId(null);
                     setTimeout(() => fetchData(account), 3000);
                 } catch (err: any) {
-                    console.error("Claim Error Details:", err);
-                    const reason = err.reason || err.message || "";
-                    if (reason.includes("0x7e273289")) {
-                        msgApi.error({ content: "操作失败：该勋章目前无法在链上定位，请检查合约部署状态" });
-                    } else {
-                        msgApi.error({ content: `失败: ${reason.slice(0, 50)}` });
-                    }
+                    console.error("Claim Error:", err);
+                    msgApi.error({ content: `领取失败: ${err.reason || err.message}` });
                 } finally {
                     setLoading(false);
                 }
@@ -128,5 +123,5 @@ export const useMedal = () => {
         });
     };
 
-    return { account, ownedMedals, proof, claimId, loading, handleClaim };
+    return { account, ownedMedals, proof, claimId, loading, handleClaim, refresh: () => fetchData(account) };
 };
