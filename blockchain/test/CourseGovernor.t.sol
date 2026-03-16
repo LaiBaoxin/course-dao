@@ -30,7 +30,7 @@ contract CourseGovernorTest is Test {
         // 给投票者准备点钱并让他买个勋章（获得投票权）
         vm.startPrank(voter);
         vm.deal(voter, 1 ether);
-        medal.buyMedal{value: 0.01 ether}(CourseMedal.Level.Bronze);
+        medal.buyMedal{value: 0.01 ether}(CourseMedal.Level.Bronze, "ipfs://mock");
         vm.stopPrank();
 
         vm.roll(block.number + 1);
@@ -64,7 +64,7 @@ contract CourseGovernorTest is Test {
 
         // --- 投票 ---
         vm.prank(voter);
-        governor.castVote(proposalId, 1); // 1 代表 For (赞成)
+         governor.castVote(proposalId, 1); // 1 代表 For (赞成)
 
         // --- 推进时间到投票结束 ---
         // votingPeriod 是 300 个区块

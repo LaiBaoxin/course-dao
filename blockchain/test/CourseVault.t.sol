@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import {Test} from "forge-std/Test.sol";
+import {Test, console} from "forge-std/Test.sol";
 import {CourseMedal} from "../src/CourseMedal.sol";
 import {CourseVault} from "../src/CourseVault.sol";
 
@@ -21,8 +21,8 @@ contract CourseVaultTest is Test {
     receive() external payable {}
 
     function testGovernanceFlow() public {
-        // 激活投票权
-        medal.safeMint(student);
+        // 给 student 发勋章并激活投票权
+        medal.safeMint(student, "ipfs://mock");
         vm.prank(student);
         medal.delegate(student);
         vm.roll(block.number + 1);
@@ -40,21 +40,27 @@ contract CourseVaultTest is Test {
         vault.execute(pid);
 
         // 断言检查
-       (,,,,,, bool executed) = vault.getProposal(pid);
+        (,,,,,, bool executed) = vault.getProposal(pid);
 
         assertTrue(executed, "Proposal should be marked as executed");
         assertEq(teacher.balance, balBefore + 1 ether, "Teacher did not receive funds");
     }
 
-    // 测试多投票的结果
+    // 多投票者的初始化逻辑
     function _setupMultipleVoters(uint256 pid) internal {
         for(uint160 i = 1; i <= 3; i++) {
-            address v = address(i + 1000);
-            medal.safeMint(v);
+            // 生成唯一地址 v (1001, 1002, 1003)
+            address v = address(i + 1000); 
+            
+            medal.safeMint(v, "ipfs://mock"); 
+            
             vm.prank(v);
             medal.delegate(v);
         }
+
+        // 推进区块以确保快照生效
         vm.roll(block.number + 1);
+
         for(uint160 i = 1; i <= 3; i++) {
             address v = address(i + 1000);
             vm.prank(v);

@@ -6,8 +6,9 @@ import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
 import { MerkleProof } from "@openzeppelin/contracts/utils/cryptography/MerkleProof.sol";
 import { ERC721Votes } from "@openzeppelin/contracts/token/ERC721/extensions/ERC721Votes.sol";
 import { EIP712 } from "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
+import { ERC721URIStorage } from "@openzeppelin/contracts/token/ERC721/extensions/ERC721URIStorage.sol";
 
-contract CourseMedal is ERC721, EIP712, ERC721Votes, Ownable {
+contract CourseMedal is ERC721, EIP712, ERC721Votes, ERC721URIStorage, Ownable {
     bytes32 public merkleRoot;
     mapping(address => bool) public hasClaimed;
     // 记录用户拥有的 TokenID，用于查询权重
@@ -51,7 +52,7 @@ contract CourseMedal is ERC721, EIP712, ERC721Votes, Ownable {
 
     // safeMint 方法（供管理员/测试脚本使用）
     // 默认赋予 Level.Bronze 等级
-    function safeMint(address to) public onlyOwner {
+    function safeMint(address to, string memory uri) public onlyOwner {
         require(!hasClaimed[to], "CourseMedal: User already has a medal");
         
         uint256 tokenId = _nextTokenId++;
@@ -60,11 +61,13 @@ contract CourseMedal is ERC721, EIP712, ERC721Votes, Ownable {
         tokenLevels[tokenId] = Level.Bronze; // 管理员手动铸造默认给青铜
 
         _safeMint(to, tokenId);
+        // 🌟 新增：设置 Token 的 IPFS URI
+        _setTokenURI(tokenId, uri);
         _delegate(to, to); // 自动开启投票权
     }
 
     // 公开申购函数
-    function buyMedal(Level level) external payable {
+    function buyMedal(Level level, string memory uri) external payable {
         uint256 requiredPrice = 0.01 ether;
         if (level == Level.Silver) requiredPrice = 0.02 ether;
         else if (level == Level.Gold) requiredPrice = 0.05 ether;
@@ -79,6 +82,8 @@ contract CourseMedal is ERC721, EIP712, ERC721Votes, Ownable {
         tokenLevels[tokenId] = level;
 
         _safeMint(msg.sender, tokenId);
+        // 设置 Token 的 IPFS URI
+        _setTokenURI(tokenId, uri);
         _delegate(msg.sender, msg.sender);
 
         emit CourseMedalBought(msg.sender, tokenId, level);
@@ -89,27 +94,41 @@ contract CourseMedal is ERC721, EIP712, ERC721Votes, Ownable {
     }
 
     // 白名单领取
-    function claim(bytes32[] calldata proof, uint256 tokenId) external {
+    function claim(bytes32[] calldata proof, uint256 tokenId, Level level, string memory uri) external {
         require(!hasClaimed[msg.sender], "Already claimed");
 
-        bytes32 leaf;
-        assembly {
-            let ptr := mload(0x40)
-            mstore(ptr, caller())         
-            mstore(add(ptr, 32), tokenId) 
-            leaf := keccak256(add(ptr, 12), 52)
-        }
+        bytes32 leaf = keccak256(abi.encodePacked(msg.sender, tokenId, level));
         
         require(MerkleProof.verify(proof, merkleRoot, leaf), "Invalid merkle proof");
 
         hasClaimed[msg.sender] = true;
         userTokenId[msg.sender] = tokenId;
-        tokenLevels[tokenId] = Level.Bronze;
+        
+        tokenLevels[tokenId] = level;
 
         _safeMint(msg.sender, tokenId);
+        _setTokenURI(tokenId, uri);
         _delegate(msg.sender, msg.sender);
 
         emit CourseMedalClaimed(msg.sender, tokenId);
+    }
+
+    function tokenURI(uint256 tokenId)
+        public
+        view
+        override(ERC721, ERC721URIStorage)
+        returns (string memory)
+    {
+        return super.tokenURI(tokenId);
+    }
+
+    function supportsInterface(bytes4 interfaceId)
+        public
+        view
+        override(ERC721, ERC721URIStorage)
+        returns (bool)
+    {
+        return super.supportsInterface(interfaceId);
     }
 
     // 重写函数进行覆盖
