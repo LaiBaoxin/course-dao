@@ -2,7 +2,7 @@ package utils
 
 import (
 	"bytes"
-	"encoding/binary"
+	"math/big"
 	"sort"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -23,18 +23,23 @@ type MerkleTree struct {
 }
 
 // HashLeaf 对齐 solidity 的 52字节
-func HashLeaf(address string, tokenId uint64) []byte {
+func HashLeaf(address string, tokenId uint64, level uint8) []byte {
 	addr := common.HexToAddress(address)
 
-	// uint256 在 EVM 中占 32 字节，Go 的 uint64 需要补零对齐
-	tokenBuf := make([]byte, 32)
-	binary.BigEndian.PutUint64(tokenBuf[24:], tokenId)
+	// 将 tokenId 转换为 32 字节的大端序字节数组
+	tokenIdBig := new(big.Int).SetUint64(tokenId)
+	tokenIdBytes := common.LeftPadBytes(tokenIdBig.Bytes(), 32)
+
+	// 转成 1 个字节
+	levelBytes := []byte{level}
 
 	var data []byte
 	data = append(data, addr.Bytes()...)
-	data = append(data, tokenBuf...)
+	data = append(data, tokenIdBytes...)
+	data = append(data, levelBytes...)
 
-	return crypto.Keccak256(data)
+	// 计算 Keccak256
+	return crypto.Keccak256Hash(data).Bytes()
 }
 
 // NewMerkleTree 接收哈希后的叶子列表
