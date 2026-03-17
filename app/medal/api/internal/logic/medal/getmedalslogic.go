@@ -5,6 +5,7 @@ import (
 	"github.com/wwater/course-dao/app/medal/api/internal/svc"
 	"github.com/wwater/course-dao/app/medal/api/internal/types"
 	"github.com/wwater/course-dao/app/medal/medal/medal"
+	"strings"
 
 	"github.com/zeromicro/go-zero/core/logx"
 )
@@ -25,9 +26,10 @@ func NewGetMedalsLogic(ctx context.Context, svcCtx *svc.ServiceContext) *GetMeda
 
 // GetMedals 获取用户所有的勋章以及可领取的证明
 func (l *GetMedalsLogic) GetMedals(req *types.GetMedalsReq) (resp *types.GetMedalsResp, err error) {
+	cleanAddress := strings.ToLower(req.Address)
 	// 获取已拥有的勋章列表
 	ownedRpcResp, err := l.svcCtx.MedalRpc.GetMedalsByAddress(l.ctx, &medal.GetMedalsReq{
-		Address: req.Address,
+		Address: cleanAddress,
 	})
 
 	ownedMedals := make([]types.MedalInfo, 0)
@@ -51,11 +53,13 @@ func (l *GetMedalsLogic) GetMedals(req *types.GetMedalsReq) (resp *types.GetMeda
 	proofRpcResp, err := l.svcCtx.MedalRpc.GetMedalProof(l.ctx, &medal.GetMedalProofReq{
 		Address: req.Address,
 	})
+	l.Infof("【调试】原始输入长度: %d, 内容: %s", len(req.Address), req.Address)
 
 	if err == nil && proofRpcResp != nil {
 		// 只有在匹配到白名单时，RPC 才会返回非空的 proof
 		proof = proofRpcResp.Proof
 		claimableTokenId = proofRpcResp.TokenId
+		l.Infof("RPC 返回原始数据: %+v", proofRpcResp)
 		l.Infof("地址 %s 匹配白名单: TokenID=%d, Proof长度=%d", req.Address, claimableTokenId, len(proof))
 	} else {
 		// RPC 错误或地址不在白名单

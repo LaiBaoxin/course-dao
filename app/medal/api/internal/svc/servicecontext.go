@@ -7,6 +7,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/wwater/course-dao/app/common/contract/medal"
+	"github.com/wwater/course-dao/app/common/pkg/ipfs"
 	"github.com/wwater/course-dao/app/medal/api/internal/config"
 	"github.com/wwater/course-dao/app/medal/api/internal/middleware"
 	"github.com/wwater/course-dao/app/medal/medalclient"
@@ -19,6 +20,7 @@ type ServiceContext struct {
 	MedalRpc             medalclient.Medal
 	MedalContract        *medal.CourseMedal
 	CheckMedalMiddleware rest.Middleware
+	PinataClient         *ipfs.PinataClient
 }
 
 func NewServiceContext(c config.Config) *ServiceContext {
@@ -37,10 +39,14 @@ func NewServiceContext(c config.Config) *ServiceContext {
 	// 初始化 RPC 客户端
 	mRpc := medalclient.NewMedal(zrpc.MustNewClient(c.MedalRpc))
 
+	// ipfs 初始化
+	ipfsClient := ipfs.NewPinataClient(c.Pinata.ApiKey, c.Pinata.ApiSecret)
+
 	return &ServiceContext{
 		Config:               c,
 		MedalRpc:             mRpc,
 		MedalContract:        medalContract,
 		CheckMedalMiddleware: middleware.NewCheckMedalMiddleware(mRpc).Handle,
+		PinataClient:         ipfsClient,
 	}
 }

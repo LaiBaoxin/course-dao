@@ -39,6 +39,15 @@ message MedalDetail {
   uint32 level = 5;
 }
 
+message UpdateMedalTokenUriReq {
+  uint32 level = 1;      // 勋章等级
+  string tokenUri = 2;   // IPFS 链接
+}
+
+message UpdateMedalTokenUriResp {
+  bool success = 1;
+}
+
 service Medal {
   // 根据地址获取勋章列表
   rpc GetMedalsByAddress(GetMedalsReq) returns (GetMedalsResp);
@@ -46,4 +55,6 @@ service Medal {
   rpc GetMedalProof(GetMedalProofReq) returns (GetMedalProofResp);
   // 根据tokenId获取勋章详情
   rpc GetMedalByTokenId(GetMedalByTokenIdReq) returns (MedalDetail);
+  // 同步 IPFS 链接到数据库
+  rpc UpdateMedalTokenUri(UpdateMedalTokenUriReq) returns (UpdateMedalTokenUriResp);
 }

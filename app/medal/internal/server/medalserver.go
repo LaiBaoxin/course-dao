@@ -40,3 +40,9 @@ func (s *MedalServer) GetMedalByTokenId(ctx context.Context, in *medal.GetMedalB
 	l := logic.NewGetMedalByTokenIdLogic(ctx, s.svcCtx)
 	return l.GetMedalByTokenId(in)
 }
+
+// 同步 IPFS 链接到数据库
+func (s *MedalServer) UpdateMedalTokenUri(ctx context.Context, in *medal.UpdateMedalTokenUriReq) (*medal.UpdateMedalTokenUriResp, error) {
+	l := logic.NewUpdateMedalTokenUriLogic(ctx, s.svcCtx)
+	return l.UpdateMedalTokenUri(in)
+}

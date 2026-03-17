@@ -393,6 +393,102 @@ func (x *MedalDetail) GetLevel() uint32 {
 	return 0
 }
 
+type UpdateMedalTokenUriReq struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Level         uint32                 `protobuf:"varint,1,opt,name=level,proto3" json:"level,omitempty"`      // 勋章等级
+	TokenUri      string                 `protobuf:"bytes,2,opt,name=tokenUri,proto3" json:"tokenUri,omitempty"` // IPFS 链接
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UpdateMedalTokenUriReq) Reset() {
+	*x = UpdateMedalTokenUriReq{}
+	mi := &file_medal_proto_msgTypes[7]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UpdateMedalTokenUriReq) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UpdateMedalTokenUriReq) ProtoMessage() {}
+
+func (x *UpdateMedalTokenUriReq) ProtoReflect() protoreflect.Message {
+	mi := &file_medal_proto_msgTypes[7]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UpdateMedalTokenUriReq.ProtoReflect.Descriptor instead.
+func (*UpdateMedalTokenUriReq) Descriptor() ([]byte, []int) {
+	return file_medal_proto_rawDescGZIP(), []int{7}
+}
+
+func (x *UpdateMedalTokenUriReq) GetLevel() uint32 {
+	if x != nil {
+		return x.Level
+	}
+	return 0
+}
+
+func (x *UpdateMedalTokenUriReq) GetTokenUri() string {
+	if x != nil {
+		return x.TokenUri
+	}
+	return ""
+}
+
+type UpdateMedalTokenUriResp struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Success       bool                   `protobuf:"varint,1,opt,name=success,proto3" json:"success,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UpdateMedalTokenUriResp) Reset() {
+	*x = UpdateMedalTokenUriResp{}
+	mi := &file_medal_proto_msgTypes[8]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UpdateMedalTokenUriResp) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UpdateMedalTokenUriResp) ProtoMessage() {}
+
+func (x *UpdateMedalTokenUriResp) ProtoReflect() protoreflect.Message {
+	mi := &file_medal_proto_msgTypes[8]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UpdateMedalTokenUriResp.ProtoReflect.Descriptor instead.
+func (*UpdateMedalTokenUriResp) Descriptor() ([]byte, []int) {
+	return file_medal_proto_rawDescGZIP(), []int{8}
+}
+
+func (x *UpdateMedalTokenUriResp) GetSuccess() bool {
+	if x != nil {
+		return x.Success
+	}
+	return false
+}
+
 var File_medal_proto protoreflect.FileDescriptor
 
 const file_medal_proto_rawDesc = "" +
@@ -419,11 +515,17 @@ const file_medal_proto_rawDesc = "" +
 	"\x06txHash\x18\x02 \x01(\tR\x06txHash\x12 \n" +
 	"\vblockNumber\x18\x03 \x01(\x04R\vblockNumber\x12\x1a\n" +
 	"\bmintTime\x18\x04 \x01(\tR\bmintTime\x12\x14\n" +
-	"\x05level\x18\x05 \x01(\rR\x05level2\xd2\x01\n" +
+	"\x05level\x18\x05 \x01(\rR\x05level\"J\n" +
+	"\x16UpdateMedalTokenUriReq\x12\x14\n" +
+	"\x05level\x18\x01 \x01(\rR\x05level\x12\x1a\n" +
+	"\btokenUri\x18\x02 \x01(\tR\btokenUri\"3\n" +
+	"\x17UpdateMedalTokenUriResp\x12\x18\n" +
+	"\asuccess\x18\x01 \x01(\bR\asuccess2\xa8\x02\n" +
 	"\x05Medal\x12?\n" +
 	"\x12GetMedalsByAddress\x12\x13.medal.GetMedalsReq\x1a\x14.medal.GetMedalsResp\x12B\n" +
 	"\rGetMedalProof\x12\x17.medal.GetMedalProofReq\x1a\x18.medal.GetMedalProofResp\x12D\n" +
-	"\x11GetMedalByTokenId\x12\x1b.medal.GetMedalByTokenIdReq\x1a\x12.medal.MedalDetailB\tZ\a./medalb\x06proto3"
+	"\x11GetMedalByTokenId\x12\x1b.medal.GetMedalByTokenIdReq\x1a\x12.medal.MedalDetail\x12T\n" +
+	"\x13UpdateMedalTokenUri\x12\x1d.medal.UpdateMedalTokenUriReq\x1a\x1e.medal.UpdateMedalTokenUriRespB\tZ\a./medalb\x06proto3"
 
 var (
 	file_medal_proto_rawDescOnce sync.Once
@@ -437,26 +539,30 @@ func file_medal_proto_rawDescGZIP() []byte {
 	return file_medal_proto_rawDescData
 }
 
-var file_medal_proto_msgTypes = make([]protoimpl.MessageInfo, 7)
+var file_medal_proto_msgTypes = make([]protoimpl.MessageInfo, 9)
 var file_medal_proto_goTypes = []any{
-	(*GetMedalsReq)(nil),         // 0: medal.GetMedalsReq
-	(*MedalInfo)(nil),            // 1: medal.MedalInfo
-	(*GetMedalsResp)(nil),        // 2: medal.GetMedalsResp
-	(*GetMedalProofReq)(nil),     // 3: medal.GetMedalProofReq
-	(*GetMedalProofResp)(nil),    // 4: medal.GetMedalProofResp
-	(*GetMedalByTokenIdReq)(nil), // 5: medal.GetMedalByTokenIdReq
-	(*MedalDetail)(nil),          // 6: medal.MedalDetail
+	(*GetMedalsReq)(nil),            // 0: medal.GetMedalsReq
+	(*MedalInfo)(nil),               // 1: medal.MedalInfo
+	(*GetMedalsResp)(nil),           // 2: medal.GetMedalsResp
+	(*GetMedalProofReq)(nil),        // 3: medal.GetMedalProofReq
+	(*GetMedalProofResp)(nil),       // 4: medal.GetMedalProofResp
+	(*GetMedalByTokenIdReq)(nil),    // 5: medal.GetMedalByTokenIdReq
+	(*MedalDetail)(nil),             // 6: medal.MedalDetail
+	(*UpdateMedalTokenUriReq)(nil),  // 7: medal.UpdateMedalTokenUriReq
+	(*UpdateMedalTokenUriResp)(nil), // 8: medal.UpdateMedalTokenUriResp
 }
 var file_medal_proto_depIdxs = []int32{
 	1, // 0: medal.GetMedalsResp.medals:type_name -> medal.MedalInfo
 	0, // 1: medal.Medal.GetMedalsByAddress:input_type -> medal.GetMedalsReq
 	3, // 2: medal.Medal.GetMedalProof:input_type -> medal.GetMedalProofReq
 	5, // 3: medal.Medal.GetMedalByTokenId:input_type -> medal.GetMedalByTokenIdReq
-	2, // 4: medal.Medal.GetMedalsByAddress:output_type -> medal.GetMedalsResp
-	4, // 5: medal.Medal.GetMedalProof:output_type -> medal.GetMedalProofResp
-	6, // 6: medal.Medal.GetMedalByTokenId:output_type -> medal.MedalDetail
-	4, // [4:7] is the sub-list for method output_type
-	1, // [1:4] is the sub-list for method input_type
+	7, // 4: medal.Medal.UpdateMedalTokenUri:input_type -> medal.UpdateMedalTokenUriReq
+	2, // 5: medal.Medal.GetMedalsByAddress:output_type -> medal.GetMedalsResp
+	4, // 6: medal.Medal.GetMedalProof:output_type -> medal.GetMedalProofResp
+	6, // 7: medal.Medal.GetMedalByTokenId:output_type -> medal.MedalDetail
+	8, // 8: medal.Medal.UpdateMedalTokenUri:output_type -> medal.UpdateMedalTokenUriResp
+	5, // [5:9] is the sub-list for method output_type
+	1, // [1:5] is the sub-list for method input_type
 	1, // [1:1] is the sub-list for extension type_name
 	1, // [1:1] is the sub-list for extension extendee
 	0, // [0:1] is the sub-list for field type_name
@@ -473,7 +579,7 @@ func file_medal_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_medal_proto_rawDesc), len(file_medal_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   7,
+			NumMessages:   9,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

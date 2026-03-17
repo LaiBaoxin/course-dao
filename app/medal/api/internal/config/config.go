@@ -19,4 +19,8 @@ type Config struct {
 		AccessSecret string
 		AccessExpire int64
 	}
+	Pinata struct {
+		ApiKey    string
+		ApiSecret string
+	}
 }

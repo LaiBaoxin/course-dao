@@ -19,9 +19,10 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	Medal_GetMedalsByAddress_FullMethodName = "/medal.Medal/GetMedalsByAddress"
-	Medal_GetMedalProof_FullMethodName      = "/medal.Medal/GetMedalProof"
-	Medal_GetMedalByTokenId_FullMethodName  = "/medal.Medal/GetMedalByTokenId"
+	Medal_GetMedalsByAddress_FullMethodName  = "/medal.Medal/GetMedalsByAddress"
+	Medal_GetMedalProof_FullMethodName       = "/medal.Medal/GetMedalProof"
+	Medal_GetMedalByTokenId_FullMethodName   = "/medal.Medal/GetMedalByTokenId"
+	Medal_UpdateMedalTokenUri_FullMethodName = "/medal.Medal/UpdateMedalTokenUri"
 )
 
 // MedalClient is the client API for Medal service.
@@ -34,6 +35,8 @@ type MedalClient interface {
 	GetMedalProof(ctx context.Context, in *GetMedalProofReq, opts ...grpc.CallOption) (*GetMedalProofResp, error)
 	// 根据tokenId获取勋章详情
 	GetMedalByTokenId(ctx context.Context, in *GetMedalByTokenIdReq, opts ...grpc.CallOption) (*MedalDetail, error)
+	// 同步 IPFS 链接到数据库
+	UpdateMedalTokenUri(ctx context.Context, in *UpdateMedalTokenUriReq, opts ...grpc.CallOption) (*UpdateMedalTokenUriResp, error)
 }
 
 type medalClient struct {
@@ -74,6 +77,16 @@ func (c *medalClient) GetMedalByTokenId(ctx context.Context, in *GetMedalByToken
 	return out, nil
 }
 
+func (c *medalClient) UpdateMedalTokenUri(ctx context.Context, in *UpdateMedalTokenUriReq, opts ...grpc.CallOption) (*UpdateMedalTokenUriResp, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(UpdateMedalTokenUriResp)
+	err := c.cc.Invoke(ctx, Medal_UpdateMedalTokenUri_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // MedalServer is the server API for Medal service.
 // All implementations must embed UnimplementedMedalServer
 // for forward compatibility.
@@ -84,6 +97,8 @@ type MedalServer interface {
 	GetMedalProof(context.Context, *GetMedalProofReq) (*GetMedalProofResp, error)
 	// 根据tokenId获取勋章详情
 	GetMedalByTokenId(context.Context, *GetMedalByTokenIdReq) (*MedalDetail, error)
+	// 同步 IPFS 链接到数据库
+	UpdateMedalTokenUri(context.Context, *UpdateMedalTokenUriReq) (*UpdateMedalTokenUriResp, error)
 	mustEmbedUnimplementedMedalServer()
 }
 
@@ -102,6 +117,9 @@ func (UnimplementedMedalServer) GetMedalProof(context.Context, *GetMedalProofReq
 }
 func (UnimplementedMedalServer) GetMedalByTokenId(context.Context, *GetMedalByTokenIdReq) (*MedalDetail, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetMedalByTokenId not implemented")
+}
+func (UnimplementedMedalServer) UpdateMedalTokenUri(context.Context, *UpdateMedalTokenUriReq) (*UpdateMedalTokenUriResp, error) {
+	return nil, status.Error(codes.Unimplemented, "method UpdateMedalTokenUri not implemented")
 }
 func (UnimplementedMedalServer) mustEmbedUnimplementedMedalServer() {}
 func (UnimplementedMedalServer) testEmbeddedByValue()               {}
@@ -178,6 +196,24 @@ func _Medal_GetMedalByTokenId_Handler(srv interface{}, ctx context.Context, dec 
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Medal_UpdateMedalTokenUri_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UpdateMedalTokenUriReq)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(MedalServer).UpdateMedalTokenUri(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Medal_UpdateMedalTokenUri_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(MedalServer).UpdateMedalTokenUri(ctx, req.(*UpdateMedalTokenUriReq))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // Medal_ServiceDesc is the grpc.ServiceDesc for Medal service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -196,6 +232,10 @@ var Medal_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetMedalByTokenId",
 			Handler:    _Medal_GetMedalByTokenId_Handler,
+		},
+		{
+			MethodName: "UpdateMedalTokenUri",
+			Handler:    _Medal_UpdateMedalTokenUri_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

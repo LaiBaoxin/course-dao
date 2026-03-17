@@ -69,3 +69,18 @@ service medal-api {
 	get /detail/:tokenId (MedalDetailReq) returns (MedalDetailRes)
 }
 
+type (
+	SyncIPFSReq {
+		Level int    `json:"level"` // 0:青铜, 1:白银, 2:黄金
+		Name  string `json:"name"` // 勋章名称
+	}
+	SyncIPFSResp {
+		TokenURI string `json:"tokenURI"`
+	}
+)
+
+service medal-api {
+	@handler SyncIPFSHandler
+	post /v1/medal/sync-ipfs (SyncIPFSReq) returns (SyncIPFSResp)
+}
+

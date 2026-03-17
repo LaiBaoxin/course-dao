@@ -4,6 +4,7 @@
 package handler
 
 import (
+	"github.com/wwater/course-dao/app/medal/api/internal/handler/ipfs"
 	"net/http"
 
 	auth "github.com/wwater/course-dao/app/medal/api/internal/handler/auth"
@@ -14,6 +15,16 @@ import (
 )
 
 func RegisterHandlers(server *rest.Server, serverCtx *svc.ServiceContext) {
+	server.AddRoutes(
+		[]rest.Route{
+			{
+				Method:  http.MethodPost,
+				Path:    "/v1/medal/sync-ipfs",
+				Handler: ipfs.SyncIPFSHandler(serverCtx),
+			},
+		},
+	)
+
 	server.AddRoutes(
 		[]rest.Route{
 			{
