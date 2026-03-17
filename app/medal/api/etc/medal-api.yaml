@@ -1,6 +1,7 @@
 Name: medal-api
 Host: 0.0.0.0
 Port: 8888
+Timeout: 30000
 MedalRpc:
   Endpoints:
     - 127.0.0.1:8080 # RPC 服务的地址
@@ -8,7 +9,10 @@ MedalRpc:
   NonBlock: true
 Eth:
   Rpc: https://eth-sepolia.g.alchemy.com/v2/h81_NhzDAZa0CosfZKdur
-  ContractAddress: 0xdD782fB0cf54970F1706c4E8fE5EA1f64d13A524
+  ContractAddress: 0xDB74fc276B744F433507Df2b1547573B9392a986
 Auth:
   AccessSecret: "CourseDao-Super-Secret-Key-2026"
   AccessExpire: 86400
+Pinata:
+  ApiKey: "API_Key" # API_Key
+  ApiSecret: "API_Secret" # API_Secret

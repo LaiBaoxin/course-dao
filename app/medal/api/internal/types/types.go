@@ -51,3 +51,12 @@ type NonceReq struct {
 type NonceResp struct {
 	Nonce string `json:"nonce"`
 }
+
+type SyncIPFSReq struct {
+	Level int    `json:"level"` // 0:青铜, 1:白银, 2:黄金
+	Name  string `json:"name"`  // 勋章名称
+}
+
+type SyncIPFSResp struct {
+	TokenURI string `json:"tokenURI"`
+}

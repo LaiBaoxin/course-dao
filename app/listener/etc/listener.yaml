@@ -1,9 +1,9 @@
 Eth:
   WSRpc: "wss://eth-sepolia.g.alchemy.com/v2/h81_NhzDAZa0CosfZKdur"
-  ContractAddress: "0x3D28b0bDFbeaf0F8aa29F4e90780f6fb8004BF01"
-  VaultAddress: "0x5392a027f5049FEEc4d575E04556Cd3C70da47a0"
-  StartBlock: 10438410
-  VaultStartBlock: 10438410
+  ContractAddress: "0xDB74fc276B744F433507Df2b1547573B9392a986"
+  VaultAddress: "0x650Bc75cd4d98c21c10e727bc515816d4dD5e32e"
+  StartBlock: 10457740
+  VaultStartBlock: 10457740
   MedalABIPath: "etc/medal_abi.json"
   VaultABIPath: "etc/vault_abi.json"
 ClickHouse:
