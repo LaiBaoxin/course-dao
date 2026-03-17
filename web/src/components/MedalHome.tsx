@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { Layout, Typography, Tag, Divider, Spin, Alert, Button, Flex, Modal, Descriptions, Tooltip } from 'antd';
+import { Layout, Typography, Tag, Divider, Spin, Alert, Button, Flex, Modal, Descriptions } from 'antd';
 import {
     LockOutlined,
     RocketOutlined,
@@ -11,13 +11,13 @@ import {
     StarFilled,
     SafetyCertificateOutlined,
     ShoppingOutlined,
-    InfoCircleOutlined,
     ExportOutlined
 } from '@ant-design/icons';
 import { useMedal } from '../hooks/useMedal';
 import { useAuth } from '../hooks/useAuth';
 import { getPremiumCourse, type PremiumCourseResp } from '../api/course';
 import { getMedalDetailByTokenId } from '../api/medal.ts';
+import { resolveIpfsUrl } from '../utils/index.ts'
 
 const { Content } = Layout;
 const { Title, Text, Paragraph } = Typography;
@@ -27,7 +27,7 @@ interface MedalHomeProps {
     setIsDarkMode: (v: boolean) => void;
 }
 
-// 新增：勋章完整详情数据接口
+// 勋章完整详情数据接口
 interface FullMedalDetail {
     name: string;
     description: string;
@@ -131,13 +131,20 @@ export const MedalHome: React.FC<MedalHomeProps> = ({ isDarkMode }) => {
 
                         <div className="absolute top-0 right-0 -mt-10 -mr-10 w-40 h-40 rounded-full blur-3xl opacity-20" style={{ backgroundColor: currentTier.color }} />
 
-                        {/* 详情 */}
                         <div
-                            className="mb-6 drop-shadow-xl inline-block transform hover:scale-110 cursor-pointer transition-transform duration-300"
-                            style={{ fontSize: '80px' }}
+                            className="mb-6 drop-shadow-xl inline-flex justify-center items-center transform hover:scale-110 cursor-pointer transition-transform duration-300"
                             onClick={() => setIsDetailVisible(true)}
                         >
-                            {currentTier.icon}
+                            {/* 如果接口返回了 image，就用网关渲染图片；否则降级显示自带 Icon */}
+                            {fullDetail?.image ? (
+                                <img
+                                    src={resolveIpfsUrl(fullDetail.image)}
+                                    alt="Course DAO Medal"
+                                    className="w-48 h-48 object-contain drop-shadow-2xl"
+                                />
+                            ) : (
+                                <div style={{ fontSize: '80px' }}>{currentTier.icon}</div>
+                            )}
                         </div>
 
                         <Title level={1} style={{ color: currentTier.color, margin: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px' }}>
@@ -218,7 +225,7 @@ export const MedalHome: React.FC<MedalHomeProps> = ({ isDarkMode }) => {
                             key="explorer"
                             type="primary"
                             icon={<ExportOutlined />}
-                            href={`https://etherscan.io/tx/${fullDetail?.txHash}`}
+                            href={`https://sepolia.etherscan.io/tx/${fullDetail?.txHash}`}
                             target="_blank"
                         >
                             浏览器查看
@@ -231,20 +238,32 @@ export const MedalHome: React.FC<MedalHomeProps> = ({ isDarkMode }) => {
                         <div className="py-2">
                             <Flex justify="center" className="mb-6">
                                 <div style={{
-                                    fontSize: '60px',
-                                    padding: '24px',
+                                    padding: fullDetail.image ? '12px' : '24px',
                                     background: isDarkMode ? '#1a1a1a' : '#f9f9f9',
                                     borderRadius: '50%',
-                                    border: `2px solid ${currentTier.color}20`
+                                    border: `2px solid ${currentTier.color}40`,
+                                    width: '140px',
+                                    height: '140px',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center'
                                 }}>
-                                    {currentTier.icon}
+                                    {fullDetail.image ? (
+                                        <img
+                                            src={resolveIpfsUrl(fullDetail.image)}
+                                            alt="Medal"
+                                            className="w-full h-full object-contain drop-shadow-md"
+                                        />
+                                    ) : (
+                                        <div style={{ fontSize: '60px' }}>{currentTier.icon}</div>
+                                    )}
                                 </div>
                             </Flex>
                             <Descriptions bordered column={1} size="small" labelStyle={{ width: '120px', fontWeight: 'bold' }}>
                                 <Descriptions.Item label="勋章名称">{fullDetail.name}</Descriptions.Item>
                                 <Descriptions.Item label="等级权重">
                                     <Tag color={currentTier.tagColor}>{currentTier.name}</Tag>
-                                    <Text type="secondary" size="small">投票权重: {currentTier.weight}</Text>
+                                    <Text type="secondary">投票权重: {currentTier.weight}</Text>
                                 </Descriptions.Item>
                                 <Descriptions.Item label="勋章简介">{fullDetail.description}</Descriptions.Item>
                                 <Descriptions.Item label="铸造时间">{fullDetail.createTime}</Descriptions.Item>

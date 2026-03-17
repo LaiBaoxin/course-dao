@@ -6,8 +6,6 @@ import { useAccount } from 'wagmi';
 import { App as AntdApp } from 'antd';
 import confetti from 'canvas-confetti';
 
-// const MEDAL_CONTRACT_ADDRESS = '0x3D28b0bDFbeaf0F8aa29F4e90780f6fb8004BF01';
-
 export const useMedal = () => {
     const { message: msgApi, modal } = AntdApp.useApp();
     const [account, setAccount] = useState<string>('');
@@ -93,11 +91,22 @@ export const useMedal = () => {
                     const signer = await provider.getSigner();
                     const contract = new ethers.Contract(CONTRACT_ADDRESS, MEDAL_ABI, signer);
 
-                    // 发起链上 claim 交易
-                    const tx = await contract.claim(proof, claimId);
-                    msgApi.info({ content: '交易已发出，正在同步区块...' });
+                    const MEDAL_URIS: Record<number, string> = {
+                        0: "ipfs://bafkreihqj3awbwuslmyy2t3nujirrn4bgfi4amhkwn3oudpcr6n7kkgsza", // Bronze
+                        1: "ipfs://bafkreiaau6zhqkf57quy3t3dxfsn4onjgdedpvqdxjtnklw52efewxpjsi", // Silver
+                        2: "ipfs://bafkreifryhj2p6x6z275xcka467qoa6fkz34vbmh23wfdwjab2awdhe2xi"  // Gold
+                    };
 
+                    const userLevel = 2;
+
+                    const uriToMint = MEDAL_URIS[userLevel];
+
+                    // 发起链上 claim 交易，传入 proof, claimId, 以及 uri
+                    const tx = await contract.claim(proof, claimId, userLevel, uriToMint);
+
+                    msgApi.info({ content: '交易已发出，正在同步区块...' });
                     await tx.wait();
+
                     msgApi.success({ content: `🎉 恭喜！勋章 #${claimId} 领取成功` });
 
                     // 撒花

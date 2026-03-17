@@ -13,8 +13,8 @@ import { config } from '../wagmi.ts';
 const { Title, Text } = Typography;
 
 // 新合约地址
-const MEDAL_ADDRESS = '0x3D28b0bDFbeaf0F8aa29F4e90780f6fb8004BF01' as `0x${string}`;
-const GOVERNOR_ADDRESS = '0x5392a027f5049FEEc4d575E04556Cd3C70da47a0' as `0x${string}`;
+const MEDAL_ADDRESS = '0xDB74fc276B744F433507Df2b1547573B9392a986' as `0x${string}`;
+const GOVERNOR_ADDRESS = '0xdb37d21553F57516a1dc9b221741f369EEf26249' as `0x${string}`;
 
 const ProposalHome: React.FC = () => {
     const [proposals, setProposals] = useState<Proposal[]>([]);
